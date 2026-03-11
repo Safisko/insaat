@@ -1,0 +1,1650 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>İnşaat Muhasebe Sistemi</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+  import { 
+    getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
+    signOut, onAuthStateChanged
+  } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+  import { 
+    getFirestore, collection, addDoc, getDocs, deleteDoc, doc,
+    query, orderBy, onSnapshot, Timestamp, where, setDoc, getDoc
+  } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+  // ═══════════════════════════════════════════
+  // 🔥 FIREBASE YAPILANDIRMASI
+  // Firebase Console'dan aldığınız değerleri buraya yapıştırın:
+  // https://console.firebase.google.com → Proje Ayarları → Web Uygulaması
+  // ═══════════════════════════════════════════
+  const firebaseConfig = {
+    apiKey: "AIzaSyDVUQuvKe9e4ns84qGrhrzYBsDrE2UyFuk",
+    authDomain: "insaat-muhasebe-881e8.firebaseapp.com",
+    projectId: "insaat-muhasebe-881e8",
+    storageBucket: "insaat-muhasebe-881e8.firebasestorage.app",
+    messagingSenderId: "133478624143",
+    appId: "1:133478624143:web:e0b3d08be2d4ab527c39fa",
+    measurementId: "G-NRBSNW2YF5"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  // Global erişim için window'a ata
+  window._firebase = { auth, db, collection, addDoc, getDocs, deleteDoc, doc,
+    query, orderBy, onSnapshot, Timestamp, where, setDoc, getDoc,
+    signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged };
+
+  window.dispatchEvent(new Event('firebase-ready'));
+</script>
+
+<!-- SheetJS (Excel) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- jsPDF (PDF) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<!-- jsPDF AutoTable -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<!-- docx (DOCX) -->
+<script src="https://unpkg.com/docx@8.2.3/build/index.js"></script>
+
+<style>
+  :root {
+    --bg:#0f0f0f; --surface:#1a1a1a; --surface2:#222;
+    --border:#2e2e2e; --accent:#f0a500; --accent2:#e05c00;
+    --green:#2ecc71; --red:#e74c3c; --blue:#3498db;
+    --text:#e8e8e8; --muted:#888;
+    --font-head:'Bebas Neue',sans-serif;
+    --font-body:'IBM Plex Sans',sans-serif;
+    --font-mono:'IBM Plex Mono',monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-height:100vh;}
+
+  /* LOGIN SCREEN */
+  #loginScreen{
+    position:fixed;inset:0;background:var(--bg);z-index:9999;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .login-box{
+    background:var(--surface);border:1px solid var(--border);border-radius:8px;
+    padding:48px;width:420px;max-width:95vw;
+  }
+  .login-box .login-logo{
+    font-family:var(--font-head);font-size:32px;letter-spacing:3px;
+    color:var(--accent);text-align:center;margin-bottom:8px;
+  }
+  .login-box .login-sub{color:var(--muted);font-size:13px;text-align:center;margin-bottom:36px;}
+  .login-tabs{display:flex;gap:0;margin-bottom:28px;border:1px solid var(--border);border-radius:4px;overflow:hidden;}
+  .login-tab{
+    flex:1;padding:10px;background:none;border:none;color:var(--muted);
+    cursor:pointer;font-family:var(--font-body);font-size:14px;transition:all .2s;
+  }
+  .login-tab.active{background:var(--accent);color:#000;font-weight:600;}
+  .login-error{background:rgba(231,76,60,.15);border:1px solid rgba(231,76,60,.3);
+    color:var(--red);padding:10px 14px;border-radius:4px;font-size:13px;margin-bottom:16px;display:none;}
+  .login-error.show{display:block;}
+  .login-info{background:rgba(52,152,219,.1);border:1px solid rgba(52,152,219,.3);
+    color:var(--blue);padding:12px 14px;border-radius:4px;font-size:12px;margin-top:20px;line-height:1.6;}
+
+  /* SETUP SCREEN */
+  #setupScreen{
+    position:fixed;inset:0;background:var(--bg);z-index:9998;
+    display:none;align-items:center;justify-content:center;
+  }
+  #setupScreen.show{display:flex;}
+
+  /* LOADING */
+  #loadingOverlay{
+    position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9997;
+    display:flex;align-items:center;justify-content:center;
+    font-family:var(--font-mono);color:var(--accent);font-size:14px;
+  }
+  #loadingOverlay.hide{display:none;}
+
+  /* HEADER */
+  header{
+    background:linear-gradient(135deg,#1a1a1a,#0f0f0f);
+    border-bottom:2px solid var(--accent);padding:0 24px;
+    display:flex;align-items:center;justify-content:space-between;
+    height:64px;position:sticky;top:0;z-index:100;
+  }
+  .logo{font-family:var(--font-head);font-size:26px;letter-spacing:2px;color:var(--accent);}
+  .logo span{color:var(--text);}
+  .header-right{display:flex;align-items:center;gap:16px;}
+  .user-badge{
+    background:var(--surface2);border:1px solid var(--border);border-radius:4px;
+    padding:6px 12px;font-size:12px;color:var(--muted);font-family:var(--font-mono);
+    display:flex;align-items:center;gap:8px;
+  }
+  .user-badge .dot{width:6px;height:6px;border-radius:50%;background:var(--green);}
+  .sync-indicator{font-family:var(--font-mono);font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px;}
+  .sync-dot{width:6px;height:6px;border-radius:50%;background:var(--muted);}
+  .sync-dot.syncing{background:var(--accent);animation:pulse 1s infinite;}
+  .sync-dot.synced{background:var(--green);}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+  .btn-logout{background:none;border:1px solid var(--border);color:var(--muted);
+    padding:6px 14px;border-radius:4px;cursor:pointer;font-size:12px;transition:all .2s;}
+  .btn-logout:hover{border-color:var(--red);color:var(--red);}
+
+  /* MENU */
+  .menu-toggle{background:none;border:none;cursor:pointer;padding:8px;
+    display:flex;flex-direction:column;gap:5px;margin-right:12px;}
+  .menu-toggle span{display:block;width:22px;height:2px;background:var(--accent);
+    border-radius:2px;transition:all .3s;}
+  .menu-toggle.collapsed span:nth-child(1){transform:rotate(45deg) translate(5px,5px);}
+  .menu-toggle.collapsed span:nth-child(2){opacity:0;transform:scaleX(0);}
+  .menu-toggle.collapsed span:nth-child(3){transform:rotate(-45deg) translate(5px,-5px);}
+
+  /* LAYOUT */
+  .app{display:flex;height:calc(100vh - 64px);}
+  nav{
+    width:220px;background:var(--surface);border-right:1px solid var(--border);
+    padding:24px 0;flex-shrink:0;overflow-y:auto;overflow-x:hidden;
+    transition:width .3s ease,padding .3s ease,opacity .3s ease;
+  }
+  nav.hidden{width:0;padding:0;opacity:0;pointer-events:none;}
+  nav .section-label{
+    font-size:10px;letter-spacing:3px;color:var(--muted);padding:16px 20px 8px;
+    font-family:var(--font-mono);text-transform:uppercase;white-space:nowrap;
+  }
+  nav button{
+    width:100%;padding:12px 20px;background:none;border:none;
+    color:var(--muted);cursor:pointer;text-align:left;font-family:var(--font-body);
+    font-size:14px;display:flex;align-items:center;gap:10px;
+    transition:all .2s;border-left:3px solid transparent;white-space:nowrap;
+  }
+  nav button:hover{color:var(--text);background:var(--surface2);}
+  nav button.active{color:var(--accent);border-left-color:var(--accent);background:rgba(240,165,0,.07);}
+  nav button .icon{font-size:16px;width:20px;text-align:center;}
+
+  /* MAIN */
+  main{flex:1;overflow-y:auto;padding:32px;}
+  .page{display:none;}
+  .page.active{display:block;}
+  .page-header{margin-bottom:28px;}
+  .page-header h1{font-family:var(--font-head);font-size:36px;letter-spacing:1px;color:var(--accent);}
+  .page-header p{color:var(--muted);font-size:13px;margin-top:4px;}
+
+  /* CARDS */
+  .stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:28px;}
+  .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:20px;position:relative;overflow:hidden;}
+  .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
+  .stat-card.yellow::before{background:var(--accent);}
+  .stat-card.green::before{background:var(--green);}
+  .stat-card.red::before{background:var(--red);}
+  .stat-card.blue::before{background:var(--blue);}
+  .stat-card .label{font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;font-family:var(--font-mono);}
+  .stat-card .value{font-family:var(--font-mono);font-size:22px;font-weight:600;margin-top:8px;}
+  .stat-card.yellow .value{color:var(--accent);}
+  .stat-card.green .value{color:var(--green);}
+  .stat-card.red .value{color:var(--red);}
+  .stat-card.blue .value{color:var(--blue);}
+
+  /* FORMS */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:24px;margin-bottom:20px;}
+  .card h2{font-family:var(--font-head);font-size:20px;letter-spacing:1px;margin-bottom:20px;color:var(--text);}
+  .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;}
+  .form-group{display:flex;flex-direction:column;gap:6px;}
+  .form-group label{font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;font-family:var(--font-mono);}
+  .form-group input,.form-group select,.form-group textarea{
+    background:var(--surface2);border:1px solid var(--border);border-radius:3px;
+    padding:10px 12px;color:var(--text);font-family:var(--font-body);font-size:14px;
+    outline:none;transition:border-color .2s;
+  }
+  .form-group input:focus,.form-group select:focus{border-color:var(--accent);}
+  .form-group select option{background:var(--surface2);}
+  .btn-row{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;align-items:center;}
+  .btn{padding:10px 24px;border:none;border-radius:3px;cursor:pointer;
+    font-family:var(--font-body);font-size:14px;font-weight:500;transition:all .2s;}
+  .btn-primary{background:var(--accent);color:#000;}
+  .btn-primary:hover{background:#ffb800;}
+  .btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
+  .btn-secondary:hover{border-color:var(--accent);}
+  .btn-danger{background:rgba(231,76,60,.15);color:var(--red);border:1px solid rgba(231,76,60,.3);}
+  .btn-danger:hover{background:rgba(231,76,60,.3);}
+  .btn-green{background:rgba(46,204,113,.15);color:var(--green);border:1px solid rgba(46,204,113,.3);}
+  .btn-green:hover{background:rgba(46,204,113,.3);}
+  .btn-blue{background:rgba(52,152,219,.15);color:var(--blue);border:1px solid rgba(52,152,219,.3);}
+  .btn-blue:hover{background:rgba(52,152,219,.3);}
+  .btn-purple{background:rgba(155,89,182,.15);color:#9b59b6;border:1px solid rgba(155,89,182,.3);}
+  .btn-purple:hover{background:rgba(155,89,182,.3);}
+
+  /* TABLE */
+  .table-wrap{overflow-x:auto;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  thead th{background:var(--surface2);padding:10px 14px;text-align:left;
+    font-family:var(--font-mono);font-size:10px;letter-spacing:2px;
+    color:var(--muted);text-transform:uppercase;border-bottom:1px solid var(--border);white-space:nowrap;}
+  tbody tr{border-bottom:1px solid var(--border);transition:background .15s;}
+  tbody tr:hover{background:rgba(255,255,255,.03);}
+  tbody td{padding:11px 14px;vertical-align:middle;}
+  .badge{display:inline-block;padding:3px 10px;border-radius:2px;font-size:11px;font-family:var(--font-mono);font-weight:600;}
+  .badge-green{background:rgba(46,204,113,.15);color:var(--green);}
+  .badge-red{background:rgba(231,76,60,.15);color:var(--red);}
+  .badge-yellow{background:rgba(240,165,0,.15);color:var(--accent);}
+  .badge-blue{background:rgba(52,152,219,.15);color:var(--blue);}
+  .del-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;
+    padding:4px 8px;border-radius:2px;transition:all .15s;}
+  .del-btn:hover{color:var(--red);background:rgba(231,76,60,.1);}
+
+  .filter-row{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center;}
+  .filter-row input,.filter-row select{
+    background:var(--surface2);border:1px solid var(--border);border-radius:3px;
+    padding:8px 12px;color:var(--text);font-family:var(--font-body);font-size:13px;outline:none;
+  }
+  .filter-row input:focus,.filter-row select:focus{border-color:var(--accent);}
+  .empty-state{padding:40px;text-align:center;color:var(--muted);font-size:14px;}
+  .dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+  @media(max-width:800px){.dash-grid{grid-template-columns:1fr;}}
+  .month-nav{display:flex;align-items:center;gap:12px;margin-bottom:20px;}
+  .month-nav button{background:var(--surface2);border:1px solid var(--border);color:var(--text);
+    padding:6px 14px;border-radius:3px;cursor:pointer;font-size:18px;}
+  .month-label{font-family:var(--font-mono);font-size:14px;color:var(--accent);min-width:140px;text-align:center;}
+
+  /* EXPORT MODAL */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;
+    display:none;align-items:center;justify-content:center;}
+  .modal-overlay.show{display:flex;}
+  .modal-box{background:var(--surface);border:1px solid var(--border);border-radius:8px;
+    padding:36px;width:520px;max-width:95vw;max-height:90vh;overflow-y:auto;}
+  .modal-box h2{font-family:var(--font-head);font-size:24px;color:var(--accent);margin-bottom:8px;}
+  .modal-box p{color:var(--muted);font-size:13px;margin-bottom:24px;}
+  .export-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px;}
+  .export-card{background:var(--surface2);border:1px solid var(--border);border-radius:6px;
+    padding:20px;text-align:center;cursor:pointer;transition:all .2s;}
+  .export-card:hover{border-color:var(--accent);background:rgba(240,165,0,.05);}
+  .export-card .ec-icon{font-size:32px;margin-bottom:8px;}
+  .export-card .ec-label{font-size:12px;font-weight:600;margin-bottom:4px;}
+  .export-card .ec-sub{font-size:11px;color:var(--muted);}
+  .export-scope{margin-bottom:20px;}
+  .export-scope label{font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;
+    font-family:var(--font-mono);display:block;margin-bottom:8px;}
+  .export-scope select{background:var(--surface2);border:1px solid var(--border);border-radius:3px;
+    padding:10px 12px;color:var(--text);font-family:var(--font-body);font-size:14px;width:100%;outline:none;}
+
+  #toast{position:fixed;bottom:24px;right:24px;background:var(--accent);color:#000;
+    padding:12px 24px;border-radius:4px;font-weight:600;font-size:14px;
+    transform:translateY(100px);opacity:0;transition:all .3s;z-index:9999;}
+  #toast.show{transform:translateY(0);opacity:1;}
+  #toast.error{background:var(--red);color:white;}
+
+  ::-webkit-scrollbar{width:6px;height:6px;}
+  ::-webkit-scrollbar-track{background:var(--bg);}
+  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="loadingOverlay">
+  <div style="text-align:center">
+    <div style="font-size:36px;margin-bottom:16px">🏗️</div>
+    <div>Yükleniyor...</div>
+  </div>
+</div>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-logo">İNŞAAT <span style="color:var(--text)">MUHASEBE</span></div>
+    <div class="login-sub">Şirket hesabınızla giriş yapın</div>
+    <div class="login-tabs">
+      <button class="login-tab active" onclick="switchTab('giris')">Giriş Yap</button>
+      <button class="login-tab" onclick="switchTab('kayit')">Kayıt Ol</button>
+    </div>
+    <div class="login-error" id="loginError"></div>
+    <div id="tabGiris">
+      <div class="form-group" style="margin-bottom:14px">
+        <label>E-posta</label>
+        <input type="email" id="loginEmail" placeholder="ornek@sirket.com">
+      </div>
+      <div class="form-group" style="margin-bottom:20px">
+        <label>Şifre</label>
+        <input type="password" id="loginPass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+      <button class="btn btn-primary" style="width:100%;padding:14px" onclick="doLogin()">Giriş Yap</button>
+    </div>
+    <div id="tabKayit" style="display:none">
+      <div class="form-group" style="margin-bottom:14px">
+        <label>Şirket Adı</label>
+        <input type="text" id="regSirket" placeholder="ABC İnşaat Ltd.">
+      </div>
+      <div class="form-group" style="margin-bottom:14px">
+        <label>E-posta</label>
+        <input type="email" id="regEmail" placeholder="ornek@sirket.com">
+      </div>
+      <div class="form-group" style="margin-bottom:20px">
+        <label>Şifre (min 6 karakter)</label>
+        <input type="password" id="regPass" placeholder="••••••••">
+      </div>
+      <button class="btn btn-primary" style="width:100%;padding:14px" onclick="doRegister()">Hesap Oluştur</button>
+    </div>
+    <div class="login-info">
+      <strong>⚙️ Kurulum Notu:</strong><br>
+      Bu uygulama Firebase gerektirmektedir. Firebase Console'dan proje oluşturup API anahtarlarını dosyanın en üstündeki <code>firebaseConfig</code> bölümüne yapıştırın.<br><br>
+      <strong>Ücretsiz Firebase limitleri</strong> küçük şirketler için yıllarca yeterlidir.
+    </div>
+  </div>
+</div>
+
+<!-- SETUP (Şirket kurulumu, ilk giriş) -->
+<div id="setupScreen">
+  <div class="login-box" style="width:480px">
+    <div class="login-logo" style="font-size:24px">Şirket Kurulumu</div>
+    <div class="login-sub">Yeni hesabınız için şirket bilgilerini girin</div>
+    <div class="form-group" style="margin-bottom:14px">
+      <label>Şirket Adı</label>
+      <input id="setupSirket" placeholder="ABC İnşaat Ltd.">
+    </div>
+    <div class="form-group" style="margin-bottom:14px">
+      <label>Yetkili Adı</label>
+      <input id="setupAd" placeholder="Ahmet Yılmaz">
+    </div>
+    <div class="form-group" style="margin-bottom:20px">
+      <label>Telefon</label>
+      <input id="setupTel" placeholder="05xx xxx xx xx">
+    </div>
+    <button class="btn btn-primary" style="width:100%;padding:14px" onclick="doSetup()">Sistemi Kur →</button>
+  </div>
+</div>
+
+<!-- EXPORT MODAL -->
+<div class="modal-overlay" id="exportModal">
+  <div class="modal-box">
+    <h2>📤 Dışa Aktar</h2>
+    <p>Format ve kapsam seçin. Dosya otomatik indirilecektir.</p>
+    <div class="export-scope">
+      <label>Dönem</label>
+      <select id="exportAySelect"></select>
+    </div>
+    <div class="export-scope">
+      <label>Kategori</label>
+      <select id="exportKategori">
+        <option value="hepsi">Tüm Kategoriler</option>
+        <option value="maaslar">Maaş & Yevmiye</option>
+        <option value="avanslar">Avanslar</option>
+        <option value="malzeme">Malzeme</option>
+        <option value="yakit">Yakıt</option>
+        <option value="yemek">Yemek</option>
+        <option value="cari">Cari / Müşteri</option>
+      </select>
+    </div>
+    <div class="export-grid">
+      <div class="export-card" onclick="doExport('xlsx')">
+        <div class="ec-icon">📊</div>
+        <div class="ec-label" style="color:#1d6f42">Excel</div>
+        <div class="ec-sub">.xlsx dosyası</div>
+      </div>
+      <div class="export-card" onclick="doExport('pdf')">
+        <div class="ec-icon">📄</div>
+        <div class="ec-label" style="color:#e74c3c">PDF</div>
+        <div class="ec-sub">Yazdırılabilir rapor</div>
+      </div>
+      <div class="export-card" onclick="doExport('docx')">
+        <div class="ec-icon">📝</div>
+        <div class="ec-label" style="color:#2980b9">Word</div>
+        <div class="ec-sub">.docx belgesi</div>
+      </div>
+    </div>
+    <button class="btn btn-secondary" onclick="closeExportModal()">Kapat</button>
+  </div>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div style="display:flex;align-items:center;gap:4px">
+    <button class="menu-toggle" id="menuToggle" onclick="toggleNav()">
+      <span></span><span></span><span></span>
+    </button>
+    <div class="logo">İNŞAAT <span>MUHASEBE</span></div>
+  </div>
+  <div class="header-right">
+    <div class="sync-indicator">
+      <div class="sync-dot" id="syncDot"></div>
+      <span id="syncText">Bağlanıyor</span>
+    </div>
+    <div class="user-badge">
+      <div class="dot"></div>
+      <span id="userEmail">-</span>
+    </div>
+    <button class="btn-logout" onclick="doLogout()">Çıkış</button>
+  </div>
+</header>
+
+<div class="app">
+  <nav id="mainNav">
+    <div class="section-label">Genel</div>
+    <button class="active" onclick="showPage('dashboard')" id="nav-dashboard"><span class="icon">📊</span> Özet</button>
+
+    <div class="section-label">Personel</div>
+    <button onclick="showPage('isciler')" id="nav-isciler"><span class="icon">👷</span> İşçiler</button>
+    <button onclick="showPage('maaslar')" id="nav-maaslar"><span class="icon">💵</span> Maaş & Yevmiye</button>
+    <button onclick="showPage('avanslar')" id="nav-avanslar"><span class="icon">💳</span> Avanslar</button>
+
+    <div class="section-label">Giderler</div>
+    <button onclick="showPage('malzeme')" id="nav-malzeme"><span class="icon">🧱</span> Malzeme</button>
+    <button onclick="showPage('yakit')" id="nav-yakit"><span class="icon">⛽</span> Yakıt</button>
+    <button onclick="showPage('yemek')" id="nav-yemek"><span class="icon">🍽️</span> Yemek</button>
+
+    <div class="section-label">Satış</div>
+    <button onclick="showPage('cari')" id="nav-cari"><span class="icon">🏗️</span> Cari / Müşteri</button>
+
+    <div class="section-label">Araçlar</div>
+    <button onclick="openExportModal()" id="nav-rapor"><span class="icon">📤</span> Dışa Aktar</button>
+    <button onclick="showPage('ayarlar')" id="nav-ayarlar"><span class="icon">⚙️</span> Ayarlar</button>
+  </nav>
+
+  <main>
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-header"><h1>📊 GENEL ÖZET</h1><p id="dashMonth"></p></div>
+      <div class="month-nav">
+        <button onclick="changeMonth(-1)">◀</button>
+        <div class="month-label" id="monthLabel"></div>
+        <button onclick="changeMonth(1)">▶</button>
+      </div>
+      <div class="stat-row" id="dashStats"></div>
+      <div class="dash-grid">
+        <div class="card">
+          <h2>Son İşlemler</h2>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Tür</th><th>Açıklama</th><th>Tutar</th><th>Tarih</th></tr></thead>
+            <tbody id="recentTable"></tbody>
+          </table></div>
+        </div>
+        <div class="card"><h2>Gider Dağılımı</h2><div id="giderDagilim" style="padding:8px 0"></div></div>
+      </div>
+    </div>
+
+    <!-- İŞÇİLER -->
+    <div class="page" id="page-isciler">
+      <div class="page-header"><h1>👷 İŞÇİ LİSTESİ</h1><p>Personel kayıt ve takip</p></div>
+      <div class="card">
+        <h2>Yeni İşçi Ekle</h2>
+        <div class="form-grid">
+          <div class="form-group"><label>Ad Soyad</label><input id="i_ad" placeholder="Ahmet Yılmaz"></div>
+          <div class="form-group"><label>Tip</label>
+            <select id="i_tip"><option value="yevmiyeli">Yevmiyeli</option><option value="maasli">Maaşlı</option></select>
+          </div>
+          <div class="form-group"><label>Telefon</label><input id="i_tel" placeholder="05xx xxx xx xx"></div>
+          <div class="form-group"><label id="i_ucret_label">Günlük Yevmiye (₺)</label><input id="i_ucret" type="number" placeholder="900"></div>
+        </div>
+        <div class="btn-row"><button class="btn btn-primary" onclick="iscilerEkle()">+ İşçi Ekle</button></div>
+      </div>
+      <div class="card"><h2>İşçiler</h2>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Ad Soyad</th><th>Tip</th><th>Telefon</th><th>Ücret</th><th>Toplam Avans</th><th></th></tr></thead>
+          <tbody id="iscilerTable"></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- MAAŞLAR -->
+    <div class="page" id="page-maaslar">
+      <div class="page-header"><h1>💵 MAAŞ & YEVMİYE</h1><p>Ödeme kayıtları</p></div>
+      <div class="card"><h2>Ödeme Ekle</h2>
+        <div class="form-grid">
+          <div class="form-group"><label>İşçi</label><select id="m_isci"></select></div>
+          <div class="form-group"><label>Ödeme Türü</label>
+            <select id="m_tur"><option value="maas">Maaş</option><option value="yevmiye">Yevmiye</option><option value="fazlamesai">Fazla Mesai</option></select>
+          </div>
+          <div class="form-group"><label>Tutar (₺)</label><input id="m_tutar" type="number" placeholder="0"></div>
+          <div class="form-group"><label>Tarih</label><input id="m_tarih" type="date"></div>
+          <div class="form-group"><label>Proje</label><input id="m_proje" placeholder="Merkez İnşaat"></div>
+          <div class="form-group"><label>Not</label><input id="m_not" placeholder="Açıklama..."></div>
+        </div>
+        <div class="btn-row"><button class="btn btn-primary" onclick="maasEkle()">+ Ödeme Ekle</button></div>
+      </div>
+      <div class="card"><h2>Ödeme Kayıtları</h2>
+        <div class="filter-row">
+          <select id="m_filter_isci" onchange="renderMaaslar()"><option value="">Tüm İşçiler</option></select>
+          <input type="month" id="m_filter_ay" onchange="renderMaaslar()">
+        </div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>İşçi</th><th>Tür</th><th>Tutar</th><th>Proje</th><th>Tarih</th><th>Not</th><th></th></tr></thead>
+          <tbody id="maaslarTable"></tbody>
+        </table></div>
+        <div style="font-family:var(--font-mono);font-size:14px;color:var(--accent);padding:12px 0" id="maasTotal"></div>
+      </div>
+    </div>
+
+    <!-- AVANSLAR -->
+    <div class="page" id="page-avanslar">
+      <div class="page-header"><h1>💳 AVANSLAR</h1><p>İşçi avans takibi</p></div>
+      <div class="card"><h2>Avans Ekle</h2>
+        <div class="form-grid">
+          <div class="form-group"><label>İşçi</label><select id="a_isci"></select></div>
+          <div class="form-group"><label>Tutar (₺)</label><input id="a_tutar" type="number" placeholder="0"></div>
+          <div class="form-group"><label>Tarih</label><input id="a_tarih" type="date"></div>
+          <div class="form-group"><label>Not</label><input id="a_not" placeholder="Açıklama..."></div>
+        </div>
+        <div class="btn-row"><button class="btn btn-primary" onclick="avansEkle()">+ Avans Ekle</button></div>
+      </div>
+      <div class="card"><h2>İşçi Avans Durumu</h2>
+        <div class="table-wrap"><table>
+          <thead><tr><th>İşçi</th><th>Toplam Avans</th><th>Son Tarih</th></tr></thead>
+          <tbody id="avansOzetTable"></tbody>
+        </table></div>
+      </div>
+      <div class="card"><h2>Tüm Avans Kayıtları</h2>
+        <div class="filter-row">
+          <select id="a_filter_isci" onchange="renderAvanslar()"><option value="">Tüm İşçiler</option></select>
+        </div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>İşçi</th><th>Tutar</th><th>Tarih</th><th>Not</th><th></th></tr></thead>
+          <tbody id="avanslarTable"></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- MALZEME -->
+    <div class="page" id="page-malzeme">
+      <div class="page-header"><h1>🧱 MALZEME GİDERLERİ</h1><p>Satın alma ve tedarik takibi</p></div>
+      <div class="card"><h2>Malzeme Ekle</h2>
+        <div class="form-grid">
+          <div class="form-group"><label>Malzeme Adı</label><input id="mal_ad" placeholder="Çimento, Demir..."></div>
+          <div class="form-group"><label>Tedarikçi</label><input id="mal_firma" placeholder="ABC Malzemeleri"></div>
+          <div class="form-group"><label>Miktar</label><input id="mal_miktar" type="number" placeholder="0"></div>
+          <div class="form-group"><label>Birim</label>
+            <select id="mal_birim"><option>Adet</option><option>Ton</option><option>M²</option><option>M³</option><option>KG</option><option>Litre</option><option>Metraj</option></select>
+          </div>
+          <div class="form-group"><label>Birim Fiyat (₺)</label><input id="mal_fiyat" type="number" placeholder="0"></div>
+          <div class="form-group"><label>Proje</label><input id="mal_proje" placeholder="Proje adı"></div>
+          <div class="form-group"><label>Tarih</label><input id="mal_tarih" type="date"></div>
+          <div class="form-group"><label>Ödeme Durumu</label>
+            <select id="mal_odeme"><option value="odendi">Ödendi</option><option value="bekliyor">Bekliyor</option><option value="kismi">Kısmi</option></select>
+          </div>
+        </div>
+        <div class="btn-row"><button class="btn btn-primary" onclick="malzemeEkle()">+ Malzeme Ekle</button></div>
+      </div>
+      <div class="card"><h2>Malzeme Listesi</h2>
+        <div class="filter-row">
+          <input placeholder="Ara..." id="mal_search" oninput="renderMalzeme()" style="width:180px">
+          <select id="mal_filter_odeme" onchange="renderMalzeme()">
+            <option value="">Tüm Durumlar</option><option value="odendi">Ödendi</option>
+            <option value="bekliyor">Bekliyor</option><option value="kismi">Kısmi</option>
+          </select>
+          <input type="month" id="mal_filter_ay" onchange="renderMalzeme()">
+        </div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Malzeme</th><th>Firma</th><th>Miktar</th><th>Birim Fiyat</th><th>Toplam</th><th>Proje</th><th>Ödeme</th><th>Tarih</th><th></th></tr></thead>
+          <tbody id="malzemeTable"></tbody>
+        </table></div>
+        <div style="font-family:var(--font-mono);font-size:14px;color:var(--accent);padding:12px 0" id="malzemeTotal"></div>
+      </div>
+    </div>
+
+    <!-- YAKIT -->
+    <div class="page" id="page-yakit">
+      <div class="page-header"><h1>⛽ YAKIT GİDERLERİ</h1></div>
+      <div class="card"><h2>Yakıt Ekle</h2>
+        <div class="form-grid">
+          <div class="form-group"><label>Araç / Makine</label><input id="y_arac" placeholder="Ford Transit - 34AB1234"></div>
+          <div class="form-group"><label>Yakıt Türü</label>
+            <select id="y_tur"><option>Motorin</option><option>Benzin</option><option>LPG</option></select>
+          </div>
+          <div class="form-group"><label>Litre</label><input id="y_litre" type="number" placeholder="0"></div>
+          <div class="form-group"><label>Litre Fiyatı (₺)</label><input id="y_fiyat" type="number" placeholder="0"></div>
+          <div class="form-group"><label>Tarih</label><input id="y_tarih" type="date"></div>
+          <div class="form-group"><label>Şantiye</label><input id="y_santiye" placeholder="Proje adı..."></div>
+        </div>
+        <div class="btn-row"><button class="btn btn-primary" onclick="yakitEkle()">+ Yakıt Ekle</button></div>
+      </div>
+      <div class="card"><h2>Yakıt Kayıtları</h2>
+        <div class="filter-row"><input type="month" id="y_filter_ay" onchange="renderYakit()"></div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Araç</th><th>Yakıt</th><th>Litre</th><th>Birim</th><th>Toplam</th><th>Şantiye</th><th>Tarih</th><th></th></tr></thead>
+          <tbody id="yakitTable"></tbody>
+        </table></div>
+        <div style="font-family:var(--font-mono);font-size:14px;color:var(--accent);padding:12px 0" id="yakitTotal"></div>
+      </div>
+    </div>
+
+    <!-- YEMEK -->
+    <div class="page" id="page-yemek">
+      <div class="page-header"><h1>🍽️ YEMEK GİDERLERİ</h1></div>
+      <div class="card"><h2>Yemek Gideri Ekle</h2>
+        <div class="form-grid">
+          <div class="form-group"><label>Şantiye / Proje</label><input id="ye_santiye" placeholder="Merkez İnşaat"></div>
+          <div class="form-group"><label>Kişi Sayısı</label><input id="ye_kisi" type="number" placeholder="10"></div>
+          <div class="form-group"><label>Kişi Başı (₺)</label><input id="ye_kisi_fiyat" type="number" placeholder="100"></div>
+          <div class="form-group"><label>Tarih</label><input id="ye_tarih" type="date"></div>
+          <div class="form-group"><label>Not</label><input id="ye_not" placeholder="Öğle yemeği..."></div>
+        </div>
+        <div class="btn-row"><button class="btn btn-primary" onclick="yemekEkle()">+ Yemek Gideri Ekle</button></div>
+      </div>
+      <div class="card"><h2>Yemek Kayıtları</h2>
+        <div class="filter-row"><input type="month" id="ye_filter_ay" onchange="renderYemek()"></div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Şantiye</th><th>Kişi</th><th>Kişi Başı</th><th>Toplam</th><th>Tarih</th><th>Not</th><th></th></tr></thead>
+          <tbody id="yemekTable"></tbody>
+        </table></div>
+        <div style="font-family:var(--font-mono);font-size:14px;color:var(--accent);padding:12px 0" id="yemekTotal"></div>
+      </div>
+    </div>
+
+    <!-- CARİ -->
+    <div class="page" id="page-cari">
+      <div class="page-header"><h1>🏗️ CARİ / MÜŞTERİ HESAPLARI</h1></div>
+      <div class="card"><h2>Müşteri / Proje Ekle</h2>
+        <div class="form-grid">
+          <div class="form-group"><label>Müşteri Adı</label><input id="c_musteri" placeholder="Ali Veli İnşaat A.Ş."></div>
+          <div class="form-group"><label>Proje Adı</label><input id="c_proje" placeholder="Merkez Konutları"></div>
+          <div class="form-group"><label>Sözleşme Tutarı (₺)</label><input id="c_sozlesme" type="number" placeholder="0"></div>
+          <div class="form-group"><label>Telefon</label><input id="c_tel" placeholder="05xx xxx xx xx"></div>
+        </div>
+        <div class="btn-row"><button class="btn btn-primary" onclick="cariMusteriEkle()">+ Müşteri Ekle</button></div>
+      </div>
+      <div class="card"><h2>Hakediş / Tahsilat Ekle</h2>
+        <div class="form-grid">
+          <div class="form-group"><label>Müşteri / Proje</label><select id="c_seç"></select></div>
+          <div class="form-group"><label>Tür</label>
+            <select id="c_tur"><option value="hakedis">Hakediş (Alacak)</option><option value="tahsilat">Tahsilat (Ödeme Alındı)</option><option value="iade">İade / Kesinti</option></select>
+          </div>
+          <div class="form-group"><label>Tutar (₺)</label><input id="c_tutar" type="number" placeholder="0"></div>
+          <div class="form-group"><label>Tarih</label><input id="c_tarih" type="date"></div>
+          <div class="form-group"><label>Not / Fatura No</label><input id="c_not" placeholder="Fatura No: 2024/001"></div>
+        </div>
+        <div class="btn-row"><button class="btn btn-primary" onclick="cariHareketEkle()">+ Hareket Ekle</button></div>
+      </div>
+      <div class="card"><h2>Müşteri Bakiyeleri</h2>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Müşteri</th><th>Proje</th><th>Sözleşme</th><th>Toplam Hakediş</th><th>Toplam Tahsilat</th><th>Bakiye (Alacak)</th></tr></thead>
+          <tbody id="cariOzetTable"></tbody>
+        </table></div>
+      </div>
+      <div class="card"><h2>Cari Hareketler</h2>
+        <div class="filter-row">
+          <select id="c_filter_musteri" onchange="renderCariHareketler()"><option value="">Tüm Müşteriler</option></select>
+        </div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Müşteri</th><th>Tür</th><th>Tutar</th><th>Tarih</th><th>Not</th><th></th></tr></thead>
+          <tbody id="cariHareketTable"></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- AYARLAR -->
+    <div class="page" id="page-ayarlar">
+      <div class="page-header"><h1>⚙️ AYARLAR</h1><p>Hesap ve sistem ayarları</p></div>
+      <div class="card">
+        <h2>Şirket Bilgileri</h2>
+        <div id="sirketInfo" style="color:var(--muted);font-size:14px;line-height:2"></div>
+      </div>
+      <div class="card">
+        <h2>Kullanıcı Yönetimi</h2>
+        <p style="color:var(--muted);font-size:13px;margin-bottom:16px">Şirketinize yeni kullanıcı davet edin. Davet edilen kullanıcı "Kayıt Ol" ile hesap açtıktan sonra şirket ID'nizi paylaşarak sisteme dahil olabilir.</p>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:16px;font-family:var(--font-mono);font-size:13px;">
+          <div style="color:var(--muted);font-size:11px;letter-spacing:2px;margin-bottom:6px">ŞİRKET ID (paylaşın)</div>
+          <div id="sirketIdDisplay" style="color:var(--accent);word-break:break-all"></div>
+        </div>
+        <div class="form-grid" style="margin-top:16px">
+          <div class="form-group"><label>Kullanıcı E-postası</label><input id="inviteEmail" placeholder="yeni@kullanici.com"></div>
+        </div>
+        <div class="btn-row"><button class="btn btn-blue" onclick="inviteUser()">👤 Kullanıcı Ekle</button></div>
+        <div class="card" style="margin-top:20px;border-color:rgba(52,152,219,.3)">
+          <h2 style="color:var(--blue)">Mevcut Sisteme Bağlan</h2>
+          <p style="color:var(--muted);font-size:13px;margin-bottom:14px">Başka bir şirket hesabına bağlanmak için şirket ID'sini girin:</p>
+          <div class="form-grid">
+            <div class="form-group"><label>Şirket ID</label><input id="joinCompanyId" placeholder="abc123..."></div>
+          </div>
+          <div class="btn-row"><button class="btn btn-blue" onclick="joinCompany()">🔗 Bağlan</button></div>
+        </div>
+      </div>
+      <div class="card" style="border-color:rgba(231,76,60,.3)">
+        <h2 style="color:var(--red)">⚠️ Tehlikeli Bölge</h2>
+        <p style="color:var(--muted);font-size:13px;margin-bottom:16px">Bu işlemler geri alınamaz.</p>
+        <div class="btn-row">
+          <button class="btn btn-danger" onclick="doLogout()">🚪 Çıkış Yap</button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════
+// STATE & DB
+// ═══════════════════════════════════════════════════
+let FB = null;
+let currentUser = null;
+let companyId = null;
+let currentMonth = new Date(); currentMonth.setDate(1);
+let unsubscribers = [];
+
+// In-memory cache (populated by Firestore listeners)
+let state = {
+  isciler:[], maaslar:[], avanslar:[], malzeme:[],
+  yakit:[], yemek:[], cariMusteriler:[], cariHareketler:[]
+};
+
+// ═══════════════════════════════════════════════════
+// FIREBASE INIT
+// ═══════════════════════════════════════════════════
+window.addEventListener('firebase-ready', () => {
+  FB = window._firebase;
+  const { auth, onAuthStateChanged } = FB;
+  onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      currentUser = user;
+      document.getElementById('userEmail').textContent = user.email;
+      await loadCompany(user.uid);
+    } else {
+      showLogin();
+    }
+  });
+});
+
+async function loadCompany(uid) {
+  setSyncState('syncing');
+  try {
+    const { db, doc, getDoc } = FB;
+    const userDoc = await getDoc(doc(db, 'users', uid));
+    if (userDoc.exists()) {
+      companyId = userDoc.data().companyId;
+      startListeners();
+      hideLogin();
+      setSyncState('synced');
+    } else {
+      // Yeni kullanıcı — şirket kurulumu
+      showSetup();
+    }
+  } catch(e) {
+    setSyncState('error');
+    toast('Bağlantı hatası: ' + e.message, true);
+  }
+}
+
+function startListeners() {
+  unsubscribers.forEach(u => u());
+  unsubscribers = [];
+  const cols = ['isciler','maaslar','avanslar','malzeme','yakit','yemek','cariMusteriler','cariHareketler'];
+  cols.forEach(col => {
+    const { db, collection, query, orderBy, onSnapshot } = FB;
+    const q = query(collection(db, 'companies', companyId, col), orderBy('createdAt', 'desc'));
+    const unsub = onSnapshot(q, (snap) => {
+      state[col] = snap.docs.map(d => ({ id: d.id, ...d.data(),
+        tarih: d.data().tarih?.toDate ? d.data().tarih.toDate().toISOString().slice(0,10) : d.data().tarih
+      }));
+      refreshCurrentPage();
+    }, (err) => {
+      console.error(col, err);
+    });
+    unsubscribers.push(unsub);
+  });
+}
+
+// ═══════════════════════════════════════════════════
+// AUTH
+// ═══════════════════════════════════════════════════
+function switchTab(tab) {
+  document.querySelectorAll('.login-tab').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('tabGiris').style.display = tab==='giris'?'block':'none';
+  document.getElementById('tabKayit').style.display = tab==='kayit'?'block':'none';
+  document.getElementById('loginError').classList.remove('show');
+}
+
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass = document.getElementById('loginPass').value;
+  if(!email || !pass) return showLoginError('E-posta ve şifre giriniz');
+  try {
+    const { auth, signInWithEmailAndPassword } = FB;
+    await signInWithEmailAndPassword(auth, email, pass);
+  } catch(e) {
+    showLoginError('Giriş başarısız: ' + (e.code === 'auth/invalid-credential' ? 'Hatalı e-posta veya şifre' : e.message));
+  }
+}
+
+async function doRegister() {
+  const sirket = document.getElementById('regSirket').value.trim();
+  const email = document.getElementById('regEmail').value.trim();
+  const pass = document.getElementById('regPass').value;
+  if(!sirket || !email || !pass) return showLoginError('Tüm alanları doldurunuz');
+  if(pass.length < 6) return showLoginError('Şifre en az 6 karakter olmalı');
+  try {
+    const { auth, createUserWithEmailAndPassword } = FB;
+    const cred = await createUserWithEmailAndPassword(auth, email, pass);
+    // Şirket verisi kurulumda oluşturulacak
+    document.getElementById('setupSirket').value = sirket;
+  } catch(e) {
+    showLoginError('Kayıt başarısız: ' + e.message);
+  }
+}
+
+async function doSetup() {
+  const sirket = document.getElementById('setupSirket').value.trim();
+  const ad = document.getElementById('setupAd').value.trim();
+  const tel = document.getElementById('setupTel').value.trim();
+  if(!sirket) return toast('Şirket adı giriniz!', true);
+  try {
+    const { db, doc, setDoc, collection, addDoc, Timestamp } = FB;
+    const uid = currentUser.uid;
+    const newCompanyId = uid; // Admin UID = Company ID (basit yaklaşım)
+    
+    // Şirket dokümanı
+    await setDoc(doc(db, 'companies', newCompanyId), {
+      name: sirket, adminUid: uid, adminAd: ad, tel,
+      createdAt: Timestamp.now()
+    });
+    // Kullanıcı dokümanı
+    await setDoc(doc(db, 'users', uid), {
+      email: currentUser.email, companyId: newCompanyId,
+      role: 'admin', ad, createdAt: Timestamp.now()
+    });
+    
+    companyId = newCompanyId;
+    document.getElementById('setupScreen').classList.remove('show');
+    startListeners();
+    hideLogin();
+    toast('✅ Şirket kuruldu! Hoş geldiniz.');
+  } catch(e) {
+    toast('Kurulum hatası: ' + e.message, true);
+  }
+}
+
+async function inviteUser() {
+  const email = document.getElementById('inviteEmail').value.trim();
+  if(!email) return toast('E-posta giriniz!', true);
+  toast(`📧 ${email} adresine şirket ID'nizi gönderin: ${companyId}`);
+  document.getElementById('inviteEmail').value = '';
+}
+
+async function joinCompany() {
+  const cid = document.getElementById('joinCompanyId').value.trim();
+  if(!cid) return toast('Şirket ID giriniz!', true);
+  try {
+    const { db, doc, getDoc, setDoc, Timestamp } = FB;
+    const compDoc = await getDoc(doc(db, 'companies', cid));
+    if(!compDoc.exists()) return toast('Şirket bulunamadı!', true);
+    await setDoc(doc(db, 'users', currentUser.uid), {
+      email: currentUser.email, companyId: cid,
+      role: 'manager', createdAt: Timestamp.now()
+    });
+    companyId = cid;
+    startListeners();
+    toast('✅ Şirkete bağlandınız!');
+  } catch(e) {
+    toast('Hata: ' + e.message, true);
+  }
+}
+
+async function doLogout() {
+  unsubscribers.forEach(u => u());
+  await FB.signOut(FB.auth);
+  location.reload();
+}
+
+function showLogin() {
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('loadingOverlay').classList.add('hide');
+}
+function hideLogin() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('setupScreen').classList.remove('show');
+  document.getElementById('loadingOverlay').classList.add('hide');
+}
+function showSetup() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('setupScreen').classList.add('show');
+  document.getElementById('loadingOverlay').classList.add('hide');
+}
+function showLoginError(msg) {
+  const el = document.getElementById('loginError');
+  el.textContent = msg; el.classList.add('show');
+}
+function setSyncState(s) {
+  const dot = document.getElementById('syncDot');
+  const txt = document.getElementById('syncText');
+  dot.className = 'sync-dot ' + (s==='syncing'?'syncing':s==='synced'?'synced':'');
+  txt.textContent = s==='syncing'?'Senkronize ediliyor':s==='synced'?'Senkronize':'Bağlantı yok';
+}
+
+// ═══════════════════════════════════════════════════
+// DB OPERATIONS
+// ═══════════════════════════════════════════════════
+async function addRecord(col, data) {
+  if(!companyId) return;
+  const { db, collection, addDoc, Timestamp } = FB;
+  setSyncState('syncing');
+  await addDoc(collection(db, 'companies', companyId, col), {
+    ...data,
+    tarih: data.tarih ? new Date(data.tarih) : new Date(),
+    createdAt: Timestamp.now(),
+    createdBy: currentUser?.email || ''
+  });
+  setSyncState('synced');
+}
+
+async function deleteRecord(col, id) {
+  if(!companyId) return;
+  const { db, doc, deleteDoc } = FB;
+  await deleteDoc(doc(db, 'companies', companyId, col, id));
+}
+
+// ═══════════════════════════════════════════════════
+// UI HELPERS
+// ═══════════════════════════════════════════════════
+function formatMoney(n) {
+  return Number(n||0).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' ₺';
+}
+function toast(msg, isError=false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = isError ? 'error' : '';
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+function todayStr() { return new Date().toISOString().slice(0,10); }
+function monthStr(d) { return d.toLocaleDateString('tr-TR',{month:'long',year:'numeric'}); }
+function monthKey(d) { return d.toISOString().slice(0,7); }
+function filterByMonth(arr, field) {
+  const mk = monthKey(currentMonth);
+  return arr.filter(r => (r[field]||'').slice(0,7) === mk);
+}
+
+let currentPageId = 'dashboard';
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  const navBtn = document.getElementById('nav-' + id);
+  if(navBtn) navBtn.classList.add('active');
+  currentPageId = id;
+  refreshPage(id);
+}
+function refreshCurrentPage() { refreshPage(currentPageId); }
+function refreshPage(id) {
+  if(id==='dashboard') renderDashboard();
+  if(id==='isciler') renderIsciler();
+  if(id==='maaslar') { populateIscilerSelect('m_isci'); populateIscilerSelect('m_filter_isci',true); renderMaaslar(); }
+  if(id==='avanslar') { populateIscilerSelect('a_isci'); populateIscilerSelect('a_filter_isci',true); renderAvanslar(); renderAvansOzet(); }
+  if(id==='malzeme') renderMalzeme();
+  if(id==='yakit') renderYakit();
+  if(id==='yemek') renderYemek();
+  if(id==='cari') { renderCariOzet(); renderCariHareketler(); populateCariSelect(); }
+  if(id==='ayarlar') renderAyarlar();
+}
+function toggleNav() {
+  document.getElementById('mainNav').classList.toggle('hidden');
+  document.getElementById('menuToggle').classList.toggle('collapsed');
+}
+function changeMonth(dir) {
+  currentMonth.setMonth(currentMonth.getMonth() + dir);
+  updateMonthLabels(); renderDashboard();
+}
+function updateMonthLabels() {
+  ['monthLabel'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.textContent = monthStr(currentMonth).toUpperCase();
+  });
+  const dp = document.getElementById('dashMonth');
+  if(dp) dp.textContent = monthStr(currentMonth) + ' dönemi';
+}
+
+// ═══════════════════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════════════════
+function renderDashboard() {
+  updateMonthLabels();
+  const maas = filterByMonth(state.maaslar,'tarih').reduce((s,r)=>s+Number(r.tutar||0),0);
+  const avans = filterByMonth(state.avanslar,'tarih').reduce((s,r)=>s+Number(r.tutar||0),0);
+  const malz = filterByMonth(state.malzeme,'tarih').reduce((s,r)=>s+Number(r.miktar||0)*Number(r.fiyat||0),0);
+  const yakit = filterByMonth(state.yakit,'tarih').reduce((s,r)=>s+Number(r.litre||0)*Number(r.fiyat||0),0);
+  const yemek = filterByMonth(state.yemek,'tarih').reduce((s,r)=>s+Number(r.kisi||0)*Number(r.kisi_fiyat||0),0);
+  const toplamGider = maas+avans+malz+yakit+yemek;
+  const hakedis = filterByMonth(state.cariHareketler,'tarih').filter(r=>r.tur==='hakedis').reduce((s,r)=>s+Number(r.tutar||0),0);
+  const tahsilat = filterByMonth(state.cariHareketler,'tarih').filter(r=>r.tur==='tahsilat').reduce((s,r)=>s+Number(r.tutar||0),0);
+  document.getElementById('dashStats').innerHTML = `
+    <div class="stat-card blue"><div class="label">Hakediş</div><div class="value">${formatMoney(hakedis)}</div></div>
+    <div class="stat-card green"><div class="label">Tahsilat</div><div class="value">${formatMoney(tahsilat)}</div></div>
+    <div class="stat-card red"><div class="label">Toplam Gider</div><div class="value">${formatMoney(toplamGider)}</div></div>
+    <div class="stat-card yellow"><div class="label">Net Kâr/Zarar</div><div class="value">${formatMoney(tahsilat-toplamGider)}</div></div>
+  `;
+  let recent = [];
+  filterByMonth(state.maaslar,'tarih').slice(0,5).forEach(r=>recent.push({tur:'Maaş',aciklama:r.isci_ad+' ('+r.tur+')',tutar:-r.tutar,tarih:r.tarih||''}));
+  filterByMonth(state.malzeme,'tarih').slice(0,5).forEach(r=>recent.push({tur:'Malzeme',aciklama:r.ad,tutar:-(r.miktar*r.fiyat),tarih:r.tarih||''}));
+  filterByMonth(state.cariHareketler,'tarih').slice(0,5).forEach(r=>recent.push({tur:'Cari',aciklama:r.musteri_ad+' ('+r.tur+')',tutar:r.tur==='hakedis'?r.tutar:-r.tutar,tarih:r.tarih||''}));
+  recent.sort((a,b)=>b.tarih.localeCompare(a.tarih));
+  recent = recent.slice(0,10);
+  const rt = document.getElementById('recentTable');
+  rt.innerHTML = !recent.length ? '<tr><td colspan="4" class="empty-state">Bu ay kayıt yok</td></tr>' :
+    recent.map(r=>`<tr>
+      <td><span class="badge ${r.tur==='Cari'?'badge-blue':r.tur==='Malzeme'?'badge-yellow':'badge-red'}">${r.tur}</span></td>
+      <td>${r.aciklama}</td>
+      <td style="font-family:var(--font-mono);color:${r.tutar>=0?'var(--green)':'var(--red)'}">${formatMoney(Math.abs(r.tutar))}</td>
+      <td style="color:var(--muted)">${r.tarih}</td>
+    </tr>`).join('');
+  const cats = [
+    {label:'Maaş/Yevmiye',val:maas,color:'var(--accent)'},
+    {label:'Avans',val:avans,color:'var(--blue)'},
+    {label:'Malzeme',val:malz,color:'#e05c00'},
+    {label:'Yakıt',val:yakit,color:'var(--green)'},
+    {label:'Yemek',val:yemek,color:'#9b59b6'},
+  ];
+  const total = cats.reduce((s,c)=>s+c.val,0)||1;
+  document.getElementById('giderDagilim').innerHTML = cats.map(c=>`
+    <div style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+        <span style="font-size:13px;color:var(--muted)">${c.label}</span>
+        <span style="font-family:var(--font-mono);font-size:12px;color:${c.color}">${formatMoney(c.val)}</span>
+      </div>
+      <div style="background:var(--border);border-radius:2px;height:6px">
+        <div style="background:${c.color};height:100%;border-radius:2px;width:${(c.val/total*100).toFixed(1)}%;transition:width .5s"></div>
+      </div>
+    </div>`).join('');
+}
+
+// ═══════════════════════════════════════════════════
+// İŞÇİLER
+// ═══════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  const tipEl = document.getElementById('i_tip');
+  if(tipEl) tipEl.addEventListener('change', function(){
+    document.getElementById('i_ucret_label').textContent = this.value==='maasli'?'Aylık Maaş (₺)':'Günlük Yevmiye (₺)';
+  });
+});
+async function iscilerEkle() {
+  const ad = document.getElementById('i_ad').value.trim();
+  const tip = document.getElementById('i_tip').value;
+  const tel = document.getElementById('i_tel').value.trim();
+  const ucret = document.getElementById('i_ucret').value;
+  if(!ad) return toast('Ad soyad giriniz!', true);
+  await addRecord('isciler', {ad, tip, tel, ucret: Number(ucret)});
+  ['i_ad','i_tel','i_ucret'].forEach(id=>document.getElementById(id).value='');
+  toast('✅ İşçi eklendi');
+}
+function renderIsciler() {
+  const tb = document.getElementById('iscilerTable');
+  if(!state.isciler.length){ tb.innerHTML='<tr><td colspan="6" class="empty-state">İşçi kaydı yok</td></tr>'; return; }
+  tb.innerHTML = state.isciler.map(i=>{
+    const topAvans = state.avanslar.filter(a=>a.isci_id===i.id).reduce((s,a)=>s+Number(a.tutar||0),0);
+    return `<tr>
+      <td><strong>${i.ad}</strong></td>
+      <td><span class="badge ${i.tip==='maasli'?'badge-blue':'badge-yellow'}">${i.tip==='maasli'?'Maaşlı':'Yevmiyeli'}</span></td>
+      <td style="color:var(--muted)">${i.tel||'-'}</td>
+      <td style="font-family:var(--font-mono)">${formatMoney(i.ucret)}</td>
+      <td style="font-family:var(--font-mono);color:var(--red)">${formatMoney(topAvans)}</td>
+      <td><button class="del-btn" onclick="delRecord('isciler','${i.id}')">🗑</button></td>
+    </tr>`;
+  }).join('');
+}
+function populateIscilerSelect(selId, withAll=false) {
+  const sel = document.getElementById(selId); if(!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = (withAll?'<option value="">Tüm İşçiler</option>':'') +
+    state.isciler.map(i=>`<option value="${i.id}">${i.ad}</option>`).join('');
+  sel.value = cur;
+}
+
+// ═══════════════════════════════════════════════════
+// MAAŞLAR
+// ═══════════════════════════════════════════════════
+async function maasEkle() {
+  const isci_id = document.getElementById('m_isci').value;
+  const tur = document.getElementById('m_tur').value;
+  const tutar = document.getElementById('m_tutar').value;
+  const tarih = document.getElementById('m_tarih').value || todayStr();
+  const proje = document.getElementById('m_proje').value;
+  const not = document.getElementById('m_not').value;
+  if(!isci_id) return toast('İşçi seçiniz!', true);
+  if(!tutar) return toast('Tutar giriniz!', true);
+  const isci = state.isciler.find(i=>i.id===isci_id);
+  await addRecord('maaslar', {isci_id, isci_ad:isci?.ad||'', tur, tutar:Number(tutar), tarih, proje, not});
+  ['m_tutar','m_not','m_proje'].forEach(id=>document.getElementById(id).value='');
+  toast('✅ Ödeme eklendi');
+}
+function renderMaaslar() {
+  const filterIsci = document.getElementById('m_filter_isci')?.value||'';
+  const filterAy = document.getElementById('m_filter_ay')?.value||'';
+  let data = state.maaslar;
+  if(filterIsci) data = data.filter(r=>r.isci_id===filterIsci);
+  if(filterAy) data = data.filter(r=>r.tarih?.slice(0,7)===filterAy);
+  const tb = document.getElementById('maaslarTable');
+  tb.innerHTML = !data.length ? '<tr><td colspan="7" class="empty-state">Kayıt yok</td></tr>' :
+    data.map(r=>`<tr>
+      <td>${r.isci_ad}</td>
+      <td><span class="badge badge-yellow">${r.tur}</span></td>
+      <td style="font-family:var(--font-mono);color:var(--accent)">${formatMoney(r.tutar)}</td>
+      <td style="color:var(--muted)">${r.proje||'-'}</td>
+      <td style="color:var(--muted)">${r.tarih}</td>
+      <td style="color:var(--muted)">${r.not||'-'}</td>
+      <td><button class="del-btn" onclick="delRecord('maaslar','${r.id}')">🗑</button></td>
+    </tr>`).join('');
+  const total = data.reduce((s,r)=>s+Number(r.tutar||0),0);
+  document.getElementById('maasTotal').textContent = `Toplam: ${formatMoney(total)}`;
+}
+
+// ═══════════════════════════════════════════════════
+// AVANSLAR
+// ═══════════════════════════════════════════════════
+async function avansEkle() {
+  const isci_id = document.getElementById('a_isci').value;
+  const tutar = document.getElementById('a_tutar').value;
+  const tarih = document.getElementById('a_tarih').value || todayStr();
+  const not = document.getElementById('a_not').value;
+  if(!isci_id) return toast('İşçi seçiniz!', true);
+  if(!tutar) return toast('Tutar giriniz!', true);
+  const isci = state.isciler.find(i=>i.id===isci_id);
+  await addRecord('avanslar', {isci_id, isci_ad:isci?.ad||'', tutar:Number(tutar), tarih, not});
+  ['a_tutar','a_not'].forEach(id=>document.getElementById(id).value='');
+  toast('✅ Avans eklendi');
+}
+function renderAvansOzet() {
+  const tb = document.getElementById('avansOzetTable');
+  if(!state.isciler.length){ tb.innerHTML='<tr><td colspan="3" class="empty-state">İşçi yok</td></tr>'; return; }
+  tb.innerHTML = state.isciler.map(i=>{
+    const avanslar = state.avanslar.filter(a=>a.isci_id===i.id);
+    const top = avanslar.reduce((s,a)=>s+Number(a.tutar||0),0);
+    const son = avanslar[0]?.tarih||'-';
+    return `<tr><td>${i.ad}</td><td style="font-family:var(--font-mono);color:var(--red)">${formatMoney(top)}</td><td style="color:var(--muted)">${son}</td></tr>`;
+  }).join('');
+}
+function renderAvanslar() {
+  const filterIsci = document.getElementById('a_filter_isci')?.value||'';
+  let data = state.avanslar;
+  if(filterIsci) data = data.filter(r=>r.isci_id===filterIsci);
+  const tb = document.getElementById('avanslarTable');
+  tb.innerHTML = !data.length ? '<tr><td colspan="5" class="empty-state">Avans kaydı yok</td></tr>' :
+    data.map(r=>`<tr>
+      <td>${r.isci_ad}</td>
+      <td style="font-family:var(--font-mono);color:var(--red)">${formatMoney(r.tutar)}</td>
+      <td style="color:var(--muted)">${r.tarih}</td>
+      <td style="color:var(--muted)">${r.not||'-'}</td>
+      <td><button class="del-btn" onclick="delRecord('avanslar','${r.id}')">🗑</button></td>
+    </tr>`).join('');
+}
+
+// ═══════════════════════════════════════════════════
+// MALZEME
+// ═══════════════════════════════════════════════════
+async function malzemeEkle() {
+  const ad = document.getElementById('mal_ad').value.trim();
+  const firma = document.getElementById('mal_firma').value.trim();
+  const miktar = Number(document.getElementById('mal_miktar').value);
+  const birim = document.getElementById('mal_birim').value;
+  const fiyat = Number(document.getElementById('mal_fiyat').value);
+  const proje = document.getElementById('mal_proje').value;
+  const tarih = document.getElementById('mal_tarih').value || todayStr();
+  const odeme = document.getElementById('mal_odeme').value;
+  if(!ad) return toast('Malzeme adı giriniz!', true);
+  await addRecord('malzeme', {ad, firma, miktar, birim, fiyat, proje, tarih, odeme});
+  ['mal_ad','mal_firma','mal_miktar','mal_fiyat','mal_proje'].forEach(id=>document.getElementById(id).value='');
+  toast('✅ Malzeme eklendi');
+}
+function renderMalzeme() {
+  const search = (document.getElementById('mal_search')?.value||'').toLowerCase();
+  const filterOdeme = document.getElementById('mal_filter_odeme')?.value||'';
+  const filterAy = document.getElementById('mal_filter_ay')?.value||'';
+  let data = state.malzeme;
+  if(search) data = data.filter(r=>r.ad?.toLowerCase().includes(search)||r.firma?.toLowerCase().includes(search));
+  if(filterOdeme) data = data.filter(r=>r.odeme===filterOdeme);
+  if(filterAy) data = data.filter(r=>r.tarih?.slice(0,7)===filterAy);
+  const tb = document.getElementById('malzemeTable');
+  tb.innerHTML = !data.length ? '<tr><td colspan="9" class="empty-state">Malzeme kaydı yok</td></tr>' :
+    data.map(r=>`<tr>
+      <td><strong>${r.ad}</strong></td>
+      <td style="color:var(--muted)">${r.firma||'-'}</td>
+      <td style="font-family:var(--font-mono)">${r.miktar} ${r.birim}</td>
+      <td style="font-family:var(--font-mono)">${formatMoney(r.fiyat)}</td>
+      <td style="font-family:var(--font-mono);color:var(--accent)">${formatMoney(r.miktar*r.fiyat)}</td>
+      <td style="color:var(--muted)">${r.proje||'-'}</td>
+      <td><span class="badge ${r.odeme==='odendi'?'badge-green':r.odeme==='bekliyor'?'badge-red':'badge-yellow'}">${r.odeme==='odendi'?'Ödendi':r.odeme==='bekliyor'?'Bekliyor':'Kısmi'}</span></td>
+      <td style="color:var(--muted)">${r.tarih}</td>
+      <td><button class="del-btn" onclick="delRecord('malzeme','${r.id}')">🗑</button></td>
+    </tr>`).join('');
+  document.getElementById('malzemeTotal').textContent = `Toplam: ${formatMoney(data.reduce((s,r)=>s+r.miktar*r.fiyat,0))}`;
+}
+
+// ═══════════════════════════════════════════════════
+// YAKIT
+// ═══════════════════════════════════════════════════
+async function yakitEkle() {
+  const arac = document.getElementById('y_arac').value.trim();
+  const tur = document.getElementById('y_tur').value;
+  const litre = Number(document.getElementById('y_litre').value);
+  const fiyat = Number(document.getElementById('y_fiyat').value);
+  const tarih = document.getElementById('y_tarih').value || todayStr();
+  const santiye = document.getElementById('y_santiye').value;
+  if(!arac) return toast('Araç giriniz!', true);
+  await addRecord('yakit', {arac, tur, litre, fiyat, tarih, santiye});
+  ['y_arac','y_litre','y_fiyat','y_santiye'].forEach(id=>document.getElementById(id).value='');
+  toast('✅ Yakıt eklendi');
+}
+function renderYakit() {
+  const filterAy = document.getElementById('y_filter_ay')?.value||'';
+  let data = filterAy ? state.yakit.filter(r=>r.tarih?.slice(0,7)===filterAy) : state.yakit;
+  const tb = document.getElementById('yakitTable');
+  tb.innerHTML = !data.length ? '<tr><td colspan="8" class="empty-state">Kayıt yok</td></tr>' :
+    data.map(r=>`<tr>
+      <td>${r.arac}</td>
+      <td><span class="badge badge-blue">${r.tur}</span></td>
+      <td style="font-family:var(--font-mono)">${r.litre} L</td>
+      <td style="font-family:var(--font-mono)">${formatMoney(r.fiyat)}</td>
+      <td style="font-family:var(--font-mono);color:var(--accent)">${formatMoney(r.litre*r.fiyat)}</td>
+      <td style="color:var(--muted)">${r.santiye||'-'}</td>
+      <td style="color:var(--muted)">${r.tarih}</td>
+      <td><button class="del-btn" onclick="delRecord('yakit','${r.id}')">🗑</button></td>
+    </tr>`).join('');
+  document.getElementById('yakitTotal').textContent = `Toplam: ${formatMoney(data.reduce((s,r)=>s+r.litre*r.fiyat,0))}`;
+}
+
+// ═══════════════════════════════════════════════════
+// YEMEK
+// ═══════════════════════════════════════════════════
+async function yemekEkle() {
+  const santiye = document.getElementById('ye_santiye').value.trim();
+  const kisi = Number(document.getElementById('ye_kisi').value);
+  const kisi_fiyat = Number(document.getElementById('ye_kisi_fiyat').value);
+  const tarih = document.getElementById('ye_tarih').value || todayStr();
+  const not = document.getElementById('ye_not').value;
+  if(!santiye) return toast('Şantiye giriniz!', true);
+  await addRecord('yemek', {santiye, kisi, kisi_fiyat, tarih, not});
+  ['ye_santiye','ye_kisi','ye_kisi_fiyat','ye_not'].forEach(id=>document.getElementById(id).value='');
+  toast('✅ Yemek gideri eklendi');
+}
+function renderYemek() {
+  const filterAy = document.getElementById('ye_filter_ay')?.value||'';
+  let data = filterAy ? state.yemek.filter(r=>r.tarih?.slice(0,7)===filterAy) : state.yemek;
+  const tb = document.getElementById('yemekTable');
+  tb.innerHTML = !data.length ? '<tr><td colspan="7" class="empty-state">Kayıt yok</td></tr>' :
+    data.map(r=>`<tr>
+      <td>${r.santiye}</td>
+      <td style="font-family:var(--font-mono)">${r.kisi} kişi</td>
+      <td style="font-family:var(--font-mono)">${formatMoney(r.kisi_fiyat)}</td>
+      <td style="font-family:var(--font-mono);color:var(--accent)">${formatMoney(r.kisi*r.kisi_fiyat)}</td>
+      <td style="color:var(--muted)">${r.tarih}</td>
+      <td style="color:var(--muted)">${r.not||'-'}</td>
+      <td><button class="del-btn" onclick="delRecord('yemek','${r.id}')">🗑</button></td>
+    </tr>`).join('');
+  document.getElementById('yemekTotal').textContent = `Toplam: ${formatMoney(data.reduce((s,r)=>s+r.kisi*r.kisi_fiyat,0))}`;
+}
+
+// ═══════════════════════════════════════════════════
+// CARİ
+// ═══════════════════════════════════════════════════
+async function cariMusteriEkle() {
+  const musteri = document.getElementById('c_musteri').value.trim();
+  const proje = document.getElementById('c_proje').value.trim();
+  const sozlesme = Number(document.getElementById('c_sozlesme').value);
+  const tel = document.getElementById('c_tel').value;
+  if(!musteri) return toast('Müşteri adı giriniz!', true);
+  await addRecord('cariMusteriler', {musteri, proje, sozlesme, tel});
+  ['c_musteri','c_proje','c_sozlesme','c_tel'].forEach(id=>document.getElementById(id).value='');
+  toast('✅ Müşteri eklendi');
+}
+function populateCariSelect() {
+  ['c_seç','c_filter_musteri'].forEach((selId, idx) => {
+    const sel = document.getElementById(selId); if(!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = (idx>0?'<option value="">Tüm Müşteriler</option>':'') +
+      state.cariMusteriler.map(m=>`<option value="${m.id}">${m.musteri} - ${m.proje||''}</option>`).join('');
+    sel.value = cur;
+  });
+}
+async function cariHareketEkle() {
+  const musteri_id = document.getElementById('c_seç').value;
+  const tur = document.getElementById('c_tur').value;
+  const tutar = Number(document.getElementById('c_tutar').value);
+  const tarih = document.getElementById('c_tarih').value || todayStr();
+  const not = document.getElementById('c_not').value;
+  if(!musteri_id) return toast('Müşteri seçiniz!', true);
+  if(!tutar) return toast('Tutar giriniz!', true);
+  const m = state.cariMusteriler.find(m=>m.id===musteri_id);
+  await addRecord('cariHareketler', {musteri_id, musteri_ad:(m?.musteri||'')+' - '+(m?.proje||''), tur, tutar, tarih, not});
+  ['c_tutar','c_not'].forEach(id=>document.getElementById(id).value='');
+  toast('✅ Hareket eklendi');
+}
+function renderCariOzet() {
+  const tb = document.getElementById('cariOzetTable');
+  if(!state.cariMusteriler.length){ tb.innerHTML='<tr><td colspan="6" class="empty-state">Müşteri yok</td></tr>'; return; }
+  tb.innerHTML = state.cariMusteriler.map(m=>{
+    const h = state.cariHareketler.filter(h=>h.musteri_id===m.id);
+    const hakedis = h.filter(h=>h.tur==='hakedis').reduce((s,h)=>s+h.tutar,0);
+    const tahsilat = h.filter(h=>h.tur==='tahsilat').reduce((s,h)=>s+h.tutar,0);
+    const bakiye = hakedis - tahsilat;
+    return `<tr>
+      <td><strong>${m.musteri}</strong></td>
+      <td style="color:var(--muted)">${m.proje||'-'}</td>
+      <td style="font-family:var(--font-mono)">${formatMoney(m.sozlesme)}</td>
+      <td style="font-family:var(--font-mono);color:var(--blue)">${formatMoney(hakedis)}</td>
+      <td style="font-family:var(--font-mono);color:var(--green)">${formatMoney(tahsilat)}</td>
+      <td style="font-family:var(--font-mono);color:${bakiye>0?'var(--red)':'var(--green)'}">${formatMoney(bakiye)}</td>
+    </tr>`;
+  }).join('');
+}
+function renderCariHareketler() {
+  const filterM = document.getElementById('c_filter_musteri')?.value||'';
+  let data = filterM ? state.cariHareketler.filter(r=>r.musteri_id===filterM) : state.cariHareketler;
+  const tb = document.getElementById('cariHareketTable');
+  tb.innerHTML = !data.length ? '<tr><td colspan="6" class="empty-state">Kayıt yok</td></tr>' :
+    data.map(r=>`<tr>
+      <td>${r.musteri_ad}</td>
+      <td><span class="badge ${r.tur==='hakedis'?'badge-blue':r.tur==='tahsilat'?'badge-green':'badge-red'}">${r.tur==='hakedis'?'Hakediş':r.tur==='tahsilat'?'Tahsilat':'İade'}</span></td>
+      <td style="font-family:var(--font-mono)">${formatMoney(r.tutar)}</td>
+      <td style="color:var(--muted)">${r.tarih}</td>
+      <td style="color:var(--muted)">${r.not||'-'}</td>
+      <td><button class="del-btn" onclick="delRecord('cariHareketler','${r.id}')">🗑</button></td>
+    </tr>`).join('');
+}
+
+// ═══════════════════════════════════════════════════
+// AYARLAR
+// ═══════════════════════════════════════════════════
+function renderAyarlar() {
+  document.getElementById('sirketIdDisplay').textContent = companyId || '-';
+  document.getElementById('sirketInfo').innerHTML = `
+    <div>👤 Giriş yapan: <strong>${currentUser?.email||'-'}</strong></div>
+    <div>🏢 Şirket ID: <code style="color:var(--accent)">${companyId||'-'}</code></div>
+    <div>🔄 Son senkronizasyon: <span style="color:var(--green)">Canlı</span></div>
+  `;
+}
+
+// ═══════════════════════════════════════════════════
+// DELETE
+// ═══════════════════════════════════════════════════
+async function delRecord(col, id) {
+  if(!confirm('Bu kaydı silmek istediğinize emin misiniz?')) return;
+  await deleteRecord(col, id);
+  toast('🗑️ Silindi');
+}
+
+// ═══════════════════════════════════════════════════
+// EXPORT
+// ═══════════════════════════════════════════════════
+function openExportModal() {
+  // Ay seçeneği doldur
+  const sel = document.getElementById('exportAySelect');
+  const months = [];
+  const now = new Date();
+  for(let i=0; i<12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    months.push({key: d.toISOString().slice(0,7), label: monthStr(d)});
+  }
+  sel.innerHTML = months.map(m=>`<option value="${m.key}">${m.label}</option>`).join('');
+  document.getElementById('exportModal').classList.add('show');
+}
+function closeExportModal() {
+  document.getElementById('exportModal').classList.remove('show');
+}
+
+function getExportData() {
+  const ay = document.getElementById('exportAySelect').value;
+  const kat = document.getElementById('exportKategori').value;
+  const filter = arr => kat==='hepsi' ? arr.filter(r=>r.tarih?.slice(0,7)===ay) :
+    arr.filter(r=>r.tarih?.slice(0,7)===ay);
+  return {
+    ay,
+    maaslar: (kat==='hepsi'||kat==='maaslar') ? filter(state.maaslar) : [],
+    avanslar: (kat==='hepsi'||kat==='avanslar') ? filter(state.avanslar) : [],
+    malzeme: (kat==='hepsi'||kat==='malzeme') ? filter(state.malzeme) : [],
+    yakit: (kat==='hepsi'||kat==='yakit') ? filter(state.yakit) : [],
+    yemek: (kat==='hepsi'||kat==='yemek') ? filter(state.yemek) : [],
+    cari: (kat==='hepsi'||kat==='cari') ? filter(state.cariHareketler) : [],
+  };
+}
+
+function calcTotals(d) {
+  const maas = d.maaslar.reduce((s,r)=>s+Number(r.tutar||0),0);
+  const avans = d.avanslar.reduce((s,r)=>s+Number(r.tutar||0),0);
+  const malz = d.malzeme.reduce((s,r)=>s+Number(r.miktar||0)*Number(r.fiyat||0),0);
+  const yakit = d.yakit.reduce((s,r)=>s+Number(r.litre||0)*Number(r.fiyat||0),0);
+  const yemek = d.yemek.reduce((s,r)=>s+Number(r.kisi||0)*Number(r.kisi_fiyat||0),0);
+  const hakedis = d.cari.filter(r=>r.tur==='hakedis').reduce((s,r)=>s+Number(r.tutar||0),0);
+  const tahsilat = d.cari.filter(r=>r.tur==='tahsilat').reduce((s,r)=>s+Number(r.tutar||0),0);
+  return { maas, avans, malz, yakit, yemek, toplamGider:maas+avans+malz+yakit+yemek, hakedis, tahsilat };
+}
+
+async function doExport(format) {
+  const d = getExportData();
+  const totals = calcTotals(d);
+  closeExportModal();
+
+  if(format === 'xlsx') exportExcel(d, totals);
+  else if(format === 'pdf') exportPDF(d, totals);
+  else if(format === 'docx') exportDocx(d, totals);
+}
+
+// --- EXCEL ---
+function exportExcel(d, totals) {
+  const wb = XLSX.utils.book_new();
+
+  // ÖZET SHEET
+  const ozet = [
+    ['İNŞAAT MUHASEBE RAPORU', ''],
+    ['Dönem:', d.ay],
+    [''],
+    ['KATEGORİ', 'TUTAR (₺)'],
+    ['Maaş & Yevmiye', totals.maas],
+    ['Avanslar', totals.avans],
+    ['Malzeme', totals.malz],
+    ['Yakıt', totals.yakit],
+    ['Yemek', totals.yemek],
+    ['TOPLAM GİDER', totals.toplamGider],
+    [''],
+    ['Hakediş', totals.hakedis],
+    ['Tahsilat', totals.tahsilat],
+    ['NET KÂR/ZARAR', totals.tahsilat - totals.toplamGider],
+  ];
+  const wsOzet = XLSX.utils.aoa_to_sheet(ozet);
+  wsOzet['!cols'] = [{wch:25},{wch:18}];
+  XLSX.utils.book_append_sheet(wb, wsOzet, 'Özet');
+
+  // MAAŞ SHEET
+  if(d.maaslar.length) {
+    const ws = XLSX.utils.json_to_sheet(d.maaslar.map(r=>({'İşçi':r.isci_ad,'Tür':r.tur,'Tutar (₺)':r.tutar,'Proje':r.proje||'','Tarih':r.tarih,'Not':r.not||''})));
+    ws['!cols'] = [{wch:20},{wch:12},{wch:12},{wch:18},{wch:12},{wch:20}];
+    XLSX.utils.book_append_sheet(wb, ws, 'Maaş-Yevmiye');
+  }
+  // AVANS SHEET
+  if(d.avanslar.length) {
+    const ws = XLSX.utils.json_to_sheet(d.avanslar.map(r=>({'İşçi':r.isci_ad,'Tutar (₺)':r.tutar,'Tarih':r.tarih,'Not':r.not||''})));
+    XLSX.utils.book_append_sheet(wb, ws, 'Avanslar');
+  }
+  // MALZEME SHEET
+  if(d.malzeme.length) {
+    const ws = XLSX.utils.json_to_sheet(d.malzeme.map(r=>({'Malzeme':r.ad,'Firma':r.firma||'','Miktar':r.miktar,'Birim':r.birim,'Birim Fiyat (₺)':r.fiyat,'Toplam (₺)':r.miktar*r.fiyat,'Proje':r.proje||'','Ödeme':r.odeme,'Tarih':r.tarih})));
+    ws['!cols'] = [{wch:18},{wch:18},{wch:8},{wch:8},{wch:14},{wch:14},{wch:16},{wch:10},{wch:12}];
+    XLSX.utils.book_append_sheet(wb, ws, 'Malzeme');
+  }
+  // YAKIT SHEET
+  if(d.yakit.length) {
+    const ws = XLSX.utils.json_to_sheet(d.yakit.map(r=>({'Araç':r.arac,'Yakıt':r.tur,'Litre':r.litre,'Litre Fiyatı (₺)':r.fiyat,'Toplam (₺)':r.litre*r.fiyat,'Şantiye':r.santiye||'','Tarih':r.tarih})));
+    XLSX.utils.book_append_sheet(wb, ws, 'Yakıt');
+  }
+  // YEMEK SHEET
+  if(d.yemek.length) {
+    const ws = XLSX.utils.json_to_sheet(d.yemek.map(r=>({'Şantiye':r.santiye,'Kişi Sayısı':r.kisi,'Kişi Başı (₺)':r.kisi_fiyat,'Toplam (₺)':r.kisi*r.kisi_fiyat,'Tarih':r.tarih,'Not':r.not||''})));
+    XLSX.utils.book_append_sheet(wb, ws, 'Yemek');
+  }
+  // CARİ SHEET
+  if(d.cari.length) {
+    const ws = XLSX.utils.json_to_sheet(d.cari.map(r=>({'Müşteri/Proje':r.musteri_ad,'Tür':r.tur,'Tutar (₺)':r.tutar,'Tarih':r.tarih,'Not':r.not||''})));
+    XLSX.utils.book_append_sheet(wb, ws, 'Cari');
+  }
+
+  XLSX.writeFile(wb, `insaat_muhasebe_${d.ay}.xlsx`);
+  toast('✅ Excel dosyası indirildi');
+}
+
+// --- PDF ---
+function exportPDF(d, totals) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+  const pageW = doc.internal.pageSize.getWidth();
+
+  // Header
+  doc.setFillColor(240, 165, 0);
+  doc.rect(0, 0, pageW, 22, 'F');
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.text('INSAAT MUHASEBE RAPORU', 14, 14);
+  doc.setFontSize(10);
+  doc.text(`Donem: ${d.ay}`, pageW-14, 14, {align:'right'});
+
+  let y = 32;
+  doc.setTextColor(50,50,50);
+  doc.setFontSize(13);
+  doc.setFont('helvetica', 'bold');
+  doc.text('OZET', 14, y); y += 6;
+
+  doc.autoTable({
+    startY: y,
+    head: [['Kategori', 'Tutar']],
+    body: [
+      ['Maas & Yevmiye', formatMoney(totals.maas)],
+      ['Avanslar', formatMoney(totals.avans)],
+      ['Malzeme Giderleri', formatMoney(totals.malz)],
+      ['Yakit Giderleri', formatMoney(totals.yakit)],
+      ['Yemek Giderleri', formatMoney(totals.yemek)],
+      ['TOPLAM GIDER', formatMoney(totals.toplamGider)],
+      ['', ''],
+      ['Hakedis', formatMoney(totals.hakedis)],
+      ['Tahsilat', formatMoney(totals.tahsilat)],
+      ['NET KAR/ZARAR', formatMoney(totals.tahsilat - totals.toplamGider)],
+    ],
+    headStyles: { fillColor:[240,165,0], textColor:[0,0,0], fontStyle:'bold' },
+    styles: { fontSize:10 },
+    columnStyles: { 1: { halign:'right' } },
+    didDrawRow: (data) => {
+      if(data.row.index === 5 || data.row.index === 9) {
+        doc.setFillColor(255, 248, 200);
+      }
+    }
+  });
+
+  // Detay tabloları
+  const tables = [
+    { title:'MAAS & YEVMIYE', data:d.maaslar, cols:['isci_ad','tur','tutar','proje','tarih'], headers:['Isci','Tur','Tutar','Proje','Tarih'] },
+    { title:'MALZEME', data:d.malzeme, cols:['ad','firma','miktar','fiyat','tarih'], headers:['Malzeme','Firma','Miktar','Fiyat','Tarih'] },
+    { title:'YAKIT', data:d.yakit, cols:['arac','tur','litre','fiyat','tarih'], headers:['Arac','Tur','Litre','Fiyat','Tarih'] },
+    { title:'YEMEK', data:d.yemek, cols:['santiye','kisi','kisi_fiyat','tarih'], headers:['Santiye','Kisi','Kisi Basi','Tarih'] },
+    { title:'CARI HAREKETLER', data:d.cari, cols:['musteri_ad','tur','tutar','tarih'], headers:['Musteri','Tur','Tutar','Tarih'] },
+  ];
+  tables.forEach(t => {
+    if(!t.data.length) return;
+    doc.addPage();
+    doc.setFillColor(240,165,0); doc.rect(0,0,pageW,18,'F');
+    doc.setTextColor(0,0,0); doc.setFontSize(13); doc.setFont('helvetica','bold');
+    doc.text(t.title, 14, 12);
+    doc.autoTable({
+      startY: 24,
+      head: [t.headers],
+      body: t.data.map(r => t.cols.map(c => r[c]||'')),
+      headStyles: { fillColor:[51,51,51], textColor:[255,255,255] },
+      styles: { fontSize:9 },
+    });
+  });
+
+  // Footer
+  const pageCount = doc.internal.getNumberOfPages();
+  for(let i=1; i<=pageCount; i++) {
+    doc.setPage(i); doc.setFontSize(8); doc.setTextColor(150,150,150);
+    doc.text(`Sayfa ${i} / ${pageCount}  |  Olusturulma: ${new Date().toLocaleDateString('tr-TR')}`, pageW/2, 290, {align:'center'});
+  }
+
+  doc.save(`insaat_muhasebe_${d.ay}.pdf`);
+  toast('✅ PDF indirildi');
+}
+
+// --- DOCX ---
+async function exportDocx(d, totals) {
+  try {
+    const { Document, Packer, Paragraph, Table, TableRow, TableCell,
+            TextRun, HeadingLevel, AlignmentType, WidthType, BorderStyle } = docx;
+
+    const headerStyle = { size:28, bold:true, color:'F0A500' };
+    const subStyle = { size:20, bold:true, color:'333333' };
+    const monoStyle = { font:'Courier New', size:18 };
+
+    function makeTable(headers, rows) {
+      return new Table({
+        width: { size:100, type:WidthType.PERCENTAGE },
+        rows: [
+          new TableRow({
+            children: headers.map(h => new TableCell({
+              children:[new Paragraph({children:[new TextRun({text:h,bold:true,size:18,color:'FFFFFF'})],alignment:AlignmentType.CENTER})],
+              shading:{fill:'333333'}
+            }))
+          }),
+          ...rows.map((row,i) => new TableRow({
+            children: row.map(cell => new TableCell({
+              children:[new Paragraph({children:[new TextRun({text:String(cell),size:18,...monoStyle})]})]
+            }))
+          }))
+        ]
+      });
+    }
+
+    const children = [
+      new Paragraph({ children:[new TextRun({text:'İNŞAAT MUHASEBE RAPORU', ...headerStyle})], heading:HeadingLevel.TITLE }),
+      new Paragraph({ children:[new TextRun({text:`Dönem: ${d.ay}  |  Oluşturma: ${new Date().toLocaleDateString('tr-TR')}`, size:20, color:'888888'})] }),
+      new Paragraph({}),
+      new Paragraph({ children:[new TextRun({text:'GİDER ÖZETİ', ...subStyle})] }),
+      new Paragraph({}),
+      makeTable(
+        ['Kategori','Tutar'],
+        [
+          ['Maaş & Yevmiye', formatMoney(totals.maas)],
+          ['Avanslar', formatMoney(totals.avans)],
+          ['Malzeme', formatMoney(totals.malz)],
+          ['Yakıt', formatMoney(totals.yakit)],
+          ['Yemek', formatMoney(totals.yemek)],
+          ['TOPLAM GİDER', formatMoney(totals.toplamGider)],
+          ['Hakediş', formatMoney(totals.hakedis)],
+          ['Tahsilat', formatMoney(totals.tahsilat)],
+          ['NET KÂR/ZARAR', formatMoney(totals.tahsilat - totals.toplamGider)],
+        ]
+      ),
+    ];
+
+    // Detay bölümleri
+    if(d.maaslar.length) {
+      children.push(new Paragraph({}), new Paragraph({children:[new TextRun({text:'MAAŞ & YEVMİYE', ...subStyle})]}), new Paragraph({}));
+      children.push(makeTable(['İşçi','Tür','Tutar','Proje','Tarih'], d.maaslar.map(r=>[r.isci_ad,r.tur,formatMoney(r.tutar),r.proje||'-',r.tarih])));
+    }
+    if(d.malzeme.length) {
+      children.push(new Paragraph({}), new Paragraph({children:[new TextRun({text:'MALZEME', ...subStyle})]}), new Paragraph({}));
+      children.push(makeTable(['Malzeme','Firma','Miktar','Birim Fiyat','Toplam','Tarih'], d.malzeme.map(r=>[r.ad,r.firma||'-',`${r.miktar} ${r.birim}`,formatMoney(r.fiyat),formatMoney(r.miktar*r.fiyat),r.tarih])));
+    }
+    if(d.cari.length) {
+      children.push(new Paragraph({}), new Paragraph({children:[new TextRun({text:'CARİ HAREKETLER', ...subStyle})]}), new Paragraph({}));
+      children.push(makeTable(['Müşteri/Proje','Tür','Tutar','Tarih','Not'], d.cari.map(r=>[r.musteri_ad,r.tur,formatMoney(r.tutar),r.tarih,r.not||'-'])));
+    }
+
+    const document = new Document({ sections:[{ children }] });
+    const blob = await Packer.toBlob(document);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement ? document.createElement('a') : Object.assign(document.createElement('a'),{});
+    // fallback
+    const link = window.document.createElement('a');
+    link.href = url; link.download = `insaat_muhasebe_${d.ay}.docx`;
+    link.click();
+    toast('✅ Word belgesi indirildi');
+  } catch(e) {
+    console.error(e);
+    toast('DOCX hatası: ' + e.message, true);
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════
+document.querySelectorAll('input[type=date]').forEach(el=>{ if(!el.value) el.value = todayStr(); });
+const mk = new Date().toISOString().slice(0,7);
+document.querySelectorAll('input[type=month]').forEach(el=>{ if(!el.value) el.value = mk; });
+updateMonthLabels();
+</script>
+</body>
+</html>
