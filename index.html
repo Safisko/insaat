@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Soylu İnşaat — Muhasebe V4</title>
+<title>Soylu İnşaat — Muhasebe V5</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -17,6 +17,11 @@
   --amber:#F0A202; --amber-dim:#4A3A16; --steel:#4F8FC7;
   --danger:#D9534F; --green:#5FA35A;
 }
+body.light{--bg:#F4F1EA;--bg2:#FFFFFF;--card:#FFFFFF;--card2:#F0EDE5;--border:#D8D2C4;--text:#2A2620;--dim:#6E6659;--faint:#9A917F;--amber-dim:#F3E3BD;}
+body.bigfont{font-size:16.5px;}
+body.bigfont .btn{font-size:15px;}
+body.bigfont table.tbl{font-size:15px;}
+body.bigfont input,body.bigfont select{font-size:16px;}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:14px;}
 h1,h2,h3{font-family:'Space Grotesk',sans-serif;}
@@ -34,9 +39,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--amber);}
 .btn-sm{padding:6px 10px;font-size:12px;border-radius:6px;}
 .btn-block{width:100%;}
 
-/* ---------- GİRİŞ EKRANI ---------- */
-#authScreen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;
-  background:linear-gradient(180deg,var(--bg2),var(--bg));}
+#authScreen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(180deg,var(--bg2),var(--bg));}
 .auth-card{width:100%;max-width:400px;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:26px;border-top:3px solid var(--amber);}
 .auth-card h1{margin:0 0 4px;font-size:22px;text-transform:uppercase;letter-spacing:.5px;}
 .auth-card .sub{color:var(--dim);font-size:12.5px;margin-bottom:20px;}
@@ -48,7 +51,6 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--amber);}
 .auth-err{color:var(--danger);font-size:12.5px;margin-top:10px;min-height:16px;}
 #cfgWarn{background:var(--amber-dim);border:1px solid var(--amber);border-radius:8px;padding:10px;font-size:12px;color:var(--text);margin-bottom:14px;display:none;}
 
-/* ---------- UYGULAMA KABUĞU ---------- */
 #appScreen{display:none;}
 .shell{display:flex;min-height:100vh;}
 .sidebar{width:210px;background:var(--bg2);border-right:1px solid var(--border);padding:18px 10px;position:fixed;top:0;bottom:0;left:0;overflow-y:auto;z-index:30;}
@@ -57,6 +59,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--amber);}
 .nav-item{display:flex;align-items:center;gap:9px;padding:10px 12px;border-radius:8px;color:var(--dim);cursor:pointer;font-size:13.5px;margin-bottom:2px;}
 .nav-item:hover{background:var(--card);color:var(--text);}
 .nav-item.active{background:var(--amber-dim);color:var(--amber);font-weight:600;}
+body.light .nav-item.active{color:#8a5e00;}
 .main{flex:1;margin-left:210px;padding:22px;max-width:1100px;}
 .page{display:none;}
 .page.active{display:block;}
@@ -65,21 +68,24 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--amber);}
 .userbadge{font-size:12px;color:var(--dim);}
 .userbadge b{color:var(--text);}
 
-/* Mobil */
 .mobiletop{display:none;position:fixed;top:0;left:0;right:0;background:var(--bg2);border-bottom:2px solid var(--amber);padding:12px 16px;z-index:30;}
 .mobiletop h1{margin:0;font-size:15px;text-transform:uppercase;}
-.tabbar{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--border);z-index:30;overflow-x:auto;white-space:nowrap;}
-.tabbar .tb{display:inline-block;text-align:center;padding:9px 12px 11px;color:var(--faint);font-size:10px;cursor:pointer;border-top:2px solid transparent;min-width:64px;}
+.tabbar{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--border);z-index:30;}
+.tabbar-inner{display:flex;max-width:560px;margin:0 auto;}
+.tabbar .tb{flex:1;text-align:center;padding:9px 4px 11px;color:var(--faint);font-size:10px;cursor:pointer;border-top:2px solid transparent;}
 .tabbar .tb .ic{display:block;font-size:17px;margin-bottom:1px;}
 .tabbar .tb.active{color:var(--amber);border-top-color:var(--amber);}
 @media(max-width:820px){
   .sidebar{display:none;}
-  .main{margin-left:0;padding:70px 14px 84px;}
+  .main{margin-left:0;padding:70px 14px 92px;}
   .mobiletop{display:block;}
   .tabbar{display:block;}
 }
+.fab{position:fixed;right:16px;bottom:74px;width:54px;height:54px;border-radius:50%;background:var(--amber);color:#1C1B19;font-size:27px;font-weight:700;border:none;box-shadow:0 4px 14px rgba(0,0,0,.4);cursor:pointer;z-index:45;line-height:1;}
+@media(min-width:821px){.fab{bottom:24px;right:24px;}}
+.qa-menu{display:flex;flex-direction:column;gap:8px;}
+.qa-menu .btn{text-align:left;}
 
-/* Kartlar & tablolar */
 .grid{display:grid;gap:12px;}
 .grid.c2{grid-template-columns:repeat(auto-fit,minmax(200px,1fr));}
 .grid.c4{grid-template-columns:repeat(auto-fit,minmax(160px,1fr));}
@@ -87,6 +93,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--amber);}
 .stat .lbl{font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
 .stat .val{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:18px;}
 .v-amber{color:var(--amber);} .v-steel{color:var(--steel);} .v-green{color:var(--green);} .v-red{color:var(--danger);}
+body.light .v-amber{color:#b07700;}
 .panel{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:14px;}
 .panel h3{margin:0 0 10px;font-size:14px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;}
 table.tbl{width:100%;border-collapse:collapse;font-size:13px;}
@@ -95,13 +102,37 @@ table.tbl td{padding:9px 6px;border-bottom:1px solid var(--border);vertical-alig
 table.tbl tr:last-child td{border-bottom:none;}
 .tblwrap{overflow-x:auto;}
 .pill{display:inline-block;font-size:10px;padding:2px 8px;border-radius:10px;background:var(--bg);border:1px solid var(--border);color:var(--dim);}
+.pending{color:var(--amber);font-size:10px;border:1px solid var(--amber);border-radius:8px;padding:1px 6px;white-space:nowrap;}
 .searchrow{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
 .searchrow input,.searchrow select{max-width:220px;}
 .rowact{white-space:nowrap;}
 .rowact .btn{margin-left:4px;}
 .empty{padding:26px;text-align:center;color:var(--faint);font-size:13px;}
+.item-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.p-left{display:flex;flex-direction:column;gap:3px;min-width:0;}
+.p-name{font-weight:600;font-size:15px;}
+.p-sub{font-size:11.5px;color:var(--dim);margin-top:1px;}
 
-/* Modal */
+.bar-row{display:flex;align-items:center;gap:8px;margin:6px 0;font-size:12px;}
+.bar-row .bl{width:64px;color:var(--dim);flex-shrink:0;font-size:11px;}
+.bar-row .bwrap{flex:1;background:var(--bg);border-radius:6px;height:15px;overflow:hidden;}
+.bar-row .bfill{height:100%;border-radius:6px;}
+.bar-row .bv{width:90px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:11px;flex-shrink:0;}
+.legend{display:flex;gap:14px;font-size:11px;color:var(--dim);margin:2px 0 8px;}
+.legend .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:-1px;}
+
+.cal-head{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;font-size:10px;color:var(--faint);text-align:center;margin-top:10px;}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-top:5px;}
+.cal-cell{aspect-ratio:1;border:1px solid var(--border);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;cursor:pointer;background:var(--card);}
+.cal-cell .dnum{font-weight:600;font-size:12.5px;}
+.cal-cell .dst{font-size:9px;color:var(--dim);}
+.cal-cell.full{background:rgba(95,163,90,.28);border-color:var(--green);}
+.cal-cell.half{background:rgba(240,162,2,.22);border-color:var(--amber);}
+.cal-cell.off{opacity:.4;}
+
+.tx-item{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);gap:8px;}
+.tx-del{color:var(--faint);cursor:pointer;font-size:15px;padding:2px 4px;}
+
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:60;display:none;align-items:center;justify-content:center;padding:16px;}
 .overlay.open{display:flex;}
 .modal{background:var(--bg2);border:1px solid var(--border);border-top:3px solid var(--amber);border-radius:14px;width:100%;max-width:440px;max-height:88vh;overflow-y:auto;padding:20px;}
@@ -112,23 +143,18 @@ table.tbl tr:last-child td{border-bottom:none;}
 .modal .actions .btn{flex:1;}
 @media(max-width:820px){.overlay{align-items:flex-end;padding:0;}.modal{border-radius:14px 14px 0 0;max-width:none;}}
 
-.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--border);color:var(--text);padding:10px 18px;border-radius:20px;font-size:13px;z-index:100;opacity:0;transition:opacity .25s;pointer-events:none;max-width:90%;text-align:center;}
+.toast{position:fixed;bottom:96px;left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--border);color:var(--text);padding:10px 18px;border-radius:20px;font-size:13px;z-index:100;opacity:0;transition:opacity .25s;pointer-events:none;max-width:90%;text-align:center;}
 .toast.show{opacity:1;}
 @media(min-width:821px){.toast{bottom:24px;}}
-.att-chip{display:inline-flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin:0 8px 8px 0;cursor:pointer;user-select:none;}
-.att-chip.on{border-color:var(--green);background:rgba(95,163,90,.12);}
-.att-chip .nm{font-weight:600;}
-.att-chip .wg{font-size:11px;color:var(--dim);}
 </style>
 </head>
 <body>
 
-<!-- ============ GİRİŞ / KAYIT ============ -->
 <div id="authScreen">
   <div class="auth-card">
     <h1>Soylu İnşaat</h1>
-    <div class="sub">Muhasebe & Şantiye Takip — V4</div>
-    <div id="cfgWarn">⚠️ Supabase ayarları girilmemiş. Bu dosyayı bir metin düzenleyicide açıp en alttaki CONFIG bölümüne kendi SUPABASE_URL ve SUPABASE_ANON_KEY değerlerinizi yazın (kurulum rehberi 2. adım).</div>
+    <div class="sub">Muhasebe & Şantiye Takip — V5</div>
+    <div id="cfgWarn">⚠️ Supabase ayarları girilmemiş. Dosyadaki CONFIG bölümüne SUPABASE_ANON_KEY değerinizi yazın.</div>
     <div class="auth-tabs">
       <div class="at active" data-mode="login">Giriş</div>
       <div class="at" data-mode="register">Kayıt Ol</div>
@@ -151,17 +177,17 @@ table.tbl tr:last-child td{border-bottom:none;}
   </div>
 </div>
 
-<!-- ============ UYGULAMA ============ -->
 <div id="appScreen">
 <div class="shell">
   <div class="sidebar">
-    <div class="brand">Soylu İnşaat<small>Muhasebe V4</small></div>
+    <div class="brand">Soylu İnşaat<small>Muhasebe V5</small></div>
     <div class="nav-item active" data-page="panel"><span>📊</span>Panel</div>
     <div class="nav-item" data-page="puantaj"><span>🗓️</span>Puantaj</div>
     <div class="nav-item" data-page="isciler"><span>👷</span>İşçiler</div>
-    <div class="nav-item" data-page="projeler"><span>🏗️</span>Projeler</div>
     <div class="nav-item" data-page="cari"><span>🏢</span>Cari / Müşteri</div>
+    <div class="nav-item" data-page="malzemeci"><span>🧱</span>Malzemeciler</div>
     <div class="nav-item" data-page="giderler"><span>🧾</span>Giderler</div>
+    <div class="nav-item" data-page="projeler"><span>🏗️</span>Projeler</div>
     <div class="nav-item" data-page="taseron"><span>🔧</span>Taşeronlar</div>
     <div class="nav-item" data-page="portfoy"><span>🏠</span>Portföy & Sözleşme</div>
     <div class="nav-item" data-page="raporlar"><span>📁</span>Raporlar</div>
@@ -172,44 +198,48 @@ table.tbl tr:last-child td{border-bottom:none;}
     <div class="page active" id="page-panel"></div>
     <div class="page" id="page-puantaj"></div>
     <div class="page" id="page-isciler"></div>
-    <div class="page" id="page-projeler"></div>
     <div class="page" id="page-cari"></div>
+    <div class="page" id="page-malzemeci"></div>
     <div class="page" id="page-giderler"></div>
+    <div class="page" id="page-projeler"></div>
     <div class="page" id="page-taseron"></div>
     <div class="page" id="page-portfoy"></div>
     <div class="page" id="page-raporlar"></div>
     <div class="page" id="page-ayarlar"></div>
   </div>
 </div>
-<div class="tabbar">
+<div class="tabbar"><div class="tabbar-inner">
   <div class="tb active" data-page="panel"><span class="ic">📊</span>Panel</div>
   <div class="tb" data-page="puantaj"><span class="ic">🗓️</span>Puantaj</div>
   <div class="tb" data-page="isciler"><span class="ic">👷</span>İşçi</div>
-  <div class="tb" data-page="projeler"><span class="ic">🏗️</span>Proje</div>
   <div class="tb" data-page="cari"><span class="ic">🏢</span>Cari</div>
   <div class="tb" data-page="giderler"><span class="ic">🧾</span>Gider</div>
-  <div class="tb" data-page="taseron"><span class="ic">🔧</span>Taşeron</div>
-  <div class="tb" data-page="portfoy"><span class="ic">🏠</span>Portföy</div>
-  <div class="tb" data-page="raporlar"><span class="ic">📁</span>Rapor</div>
-  <div class="tb" data-page="ayarlar"><span class="ic">⚙️</span>Ayar</div>
-</div>
+  <div class="tb" data-page="diger"><span class="ic">☰</span>Diğer</div>
+</div></div>
+<button class="fab" id="fabBtn">+</button>
 </div>
 
 <div class="overlay" id="modalOverlay"><div class="modal" id="modalBox"></div></div>
 <div class="toast" id="toast"></div>
 <script>
 /* =====================================================
-   CONFIG — KURULUM REHBERİ ADIM 2:
-   Supabase Dashboard > Settings > API'den kopyalayın.
+   CONFIG — Supabase Dashboard > Settings > API Keys
+   URL hazır girildi; sadece Publishable key'inizi yazın.
    ===================================================== */
-const SUPABASE_URL = "https://yvbbojujrouiscasgfpl.supabase.co";       // örn: https://abcdxyz.supabase.co
-const SUPABASE_ANON_KEY = "sb_publishable_ecNHncTWwCmL8AhGp16V4w_XA6lWPOT";      // "anon public" anahtarı
+const SUPABASE_URL = "https://yvbbojujrouiscasgfpl.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_ecNHncTWwCmL8AhGp16V4w_XA6lWPOT";   // sb_publishable_... ile başlayan anahtar
 /* ===================================================== */
 
 const CFG_OK = SUPABASE_URL.startsWith("https://") && SUPABASE_ANON_KEY.length > 30;
 let sb = null, me = null, myCompany = null;
 if (CFG_OK) sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 else document.getElementById("cfgWarn").style.display = "block";
+
+/* ---------- tema / yazı boyutu ---------- */
+(function(){ try{
+  if(localStorage.getItem("theme")==="light") document.body.classList.add("light");
+  if(localStorage.getItem("bigfont")==="1") document.body.classList.add("bigfont");
+}catch(e){} })();
 
 /* ---------- yardımcılar ---------- */
 const $ = (id) => document.getElementById(id);
@@ -223,7 +253,29 @@ function toast(m) { const t = $("toast"); t.textContent = m; t.classList.add("sh
 const isAdmin = () => me?.role === "yonetici";
 const MONTHS = ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
 const mlabel = (mk) => { const [y, m] = mk.split("-"); return MONTHS[+m - 1] + " " + y; };
+const mshort = (mk) => { const [y, m] = mk.split("-"); return MONTHS[+m - 1].slice(0,3) + " " + y.slice(2); };
 function monthOptions(sel) { const out = []; const now = new Date(); for (let i = 0; i < 12; i++) { const d = new Date(now.getFullYear(), now.getMonth() - i, 1); const k = d.toISOString().slice(0, 7); out.push(`<option value="${k}" ${k === sel ? "selected" : ""}>${mlabel(k)}</option>`); } return out.join(""); }
+function monthRange(mk) { const [y, m] = mk.split("-").map(Number); const start = `${mk}-01`; const end = new Date(y, m, 0).toISOString().slice(0, 10); return { start, end }; }
+const PAY_OPTS = [{ v: "", t: "— yöntem —" }, { v: "nakit", t: "Nakit" }, { v: "banka", t: "Banka" }, { v: "kart", t: "Kart" }];
+const payField = { key: "payment_method", label: "Ödeme Yöntemi", type: "select", options: PAY_OPTS };
+const frLabel = (f) => { f = +f; return f === 1 ? "tam" : (f === 0.5 ? "yarım" : (f === 1.5 ? "1,5" : String(f).replace(".", ","))); };
+const FR_OPTS = [{ v: "1", t: "Tam" }, { v: "0.5", t: "Yarım" }, { v: "1.5", t: "Mesaili (1,5)" }];
+
+async function uploadPhoto(file) {
+  if (!file) return null;
+  const path = myCompany.id + "/" + Date.now() + "-" + file.name.replace(/[^a-zA-Z0-9.\-_]/g, "");
+  const { error } = await sb.storage.from("fisler").upload(path, file);
+  if (error) { toast("Fotoğraf yüklenemedi: " + error.message); return null; }
+  const { data } = sb.storage.from("fisler").getPublicUrl(path);
+  return data.publicUrl;
+}
+async function checkDup(table, match) {
+  let query = sb.from(table).select("id").limit(1);
+  for (const [k, v] of Object.entries(match)) { if (v == null) continue; query = query.eq(k, v); }
+  const { data } = await query;
+  if (data && data.length) return window.confirm("Dikkat: aynı gün, aynı tutarda benzer bir kayıt zaten var (Telegram'dan girilmiş olabilir). Yine de eklensin mi?");
+  return true;
+}
 
 /* ---------- modal form üretici ---------- */
 function openForm(title, fields, initial, onSave, extraBtn) {
@@ -233,6 +285,9 @@ function openForm(title, fields, initial, onSave, extraBtn) {
     if (f.type === "select") {
       return `<div class="fld"><label>${esc(f.label)}</label><select id="ff_${f.key}">${f.options.map((o) => `<option value="${esc(o.v)}" ${String(o.v) === String(v) ? "selected" : ""}>${esc(o.t)}</option>`).join("")}</select></div>`;
     }
+    if (f.type === "file") {
+      return `<div class="fld"><label>${esc(f.label)}</label><input id="ff_${f.key}" type="file" accept="image/*"></div>`;
+    }
     return `<div class="fld"><label>${esc(f.label)}</label><input id="ff_${f.key}" type="${f.type || "text"}" value="${esc(v)}"></div>`;
   }).join("") + `<div class="actions"><button class="btn btn-outline" id="ffCancel">Vazgeç</button>${extraBtn || ""}<button class="btn btn-amber" id="ffSave">Kaydet</button></div>`;
   $("modalOverlay").classList.add("open");
@@ -240,6 +295,7 @@ function openForm(title, fields, initial, onSave, extraBtn) {
   $("ffSave").onclick = async () => {
     const vals = {};
     for (const f of fields) {
+      if (f.type === "file") { vals[f.key] = $("ff_" + f.key).files[0] || null; continue; }
       let v = $("ff_" + f.key).value;
       if (f.type === "number") v = v === "" ? null : parseFloat(v);
       if (v === "") v = null;
@@ -258,6 +314,11 @@ async function del(table, id, cb) {
   if (!isAdmin()) { toast("Silme yetkisi sadece yöneticide"); return; }
   if (!(await confirmDel())) return;
   const { error } = await sb.from(table).delete().eq("id", id);
+  if (error) toast("Silinemedi: " + error.message); else { toast("Silindi"); cb && cb(); }
+}
+async function delAtt(id, cb) { // puantaj düzeltmesi herkes yapabilir
+  if (!(await confirmDel("Bu puantaj kaydı silinsin mi?"))) return;
+  const { error } = await sb.from("attendance").delete().eq("id", id);
   if (error) toast("Silinemedi: " + error.message); else { toast("Silindi"); cb && cb(); }
 }
 
@@ -290,7 +351,7 @@ $("aSubmit").onclick = async () => {
       if ($("aJoinMode").value === "create") {
         const { data, error } = await sb.rpc("create_company", { p_name: $("aCompany").value.trim() || "Şirketim", p_full_name: name });
         if (error) throw error;
-        alert("Şirket kuruldu!\n\nŞİRKET KODUNUZ: " + data.code + "\n\nBu kodu babanız ve Nurettin abi kayıt olurken kullanacak. Ayarlar sayfasından da görülebilir.");
+        alert("Şirket kuruldu!\n\nŞİRKET KODUNUZ: " + data.code + "\n\nBu kodu diğer kullanıcılar kayıt olurken kullanacak. Ayarlar sayfasından da görülebilir.");
       } else {
         const { error } = await sb.rpc("join_company", { p_code: $("aCode").value.trim(), p_full_name: name });
         if (error) throw error;
@@ -304,7 +365,6 @@ $("aSubmit").onclick = async () => {
   $("aSubmit").disabled = false;
 };
 
-/* ---------- başlangıç ---------- */
 async function boot() {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) return;
@@ -318,14 +378,79 @@ async function boot() {
   nav("panel");
 }
 
-/* ---------- gezinme ---------- */
-const PAGES = { panel: renderPanel, puantaj: renderPuantaj, isciler: renderIsciler, projeler: renderProjeler, cari: renderCari, giderler: renderGiderler, taseron: renderTaseron, portfoy: renderPortfoy, raporlar: renderRaporlar, ayarlar: renderAyarlar };
+/* ---------- gezinme + Diğer menüsü + FAB ---------- */
+const PAGES = { panel: renderPanel, puantaj: renderPuantaj, isciler: renderIsciler, cari: renderCari, malzemeci: renderMalzemeci, giderler: renderGiderler, projeler: renderProjeler, taseron: renderTaseron, portfoy: renderPortfoy, raporlar: renderRaporlar, ayarlar: renderAyarlar };
 function nav(p) {
+  if (p === "diger") {
+    const box = $("modalBox");
+    box.innerHTML = `<h3>Diğer</h3><div class="qa-menu">` +
+      [["projeler","🏗️ Projeler"],["malzemeci","🧱 Malzemeciler"],["taseron","🔧 Taşeronlar"],["portfoy","🏠 Portföy & Sözleşme"],["raporlar","📁 Raporlar"],["ayarlar","⚙️ Ayarlar"]]
+        .map(([k,t]) => `<button class="btn btn-outline" data-nav="${k}">${t}</button>`).join("") +
+      `</div><div class="actions"><button class="btn btn-outline" id="dgClose">Kapat</button></div>`;
+    $("modalOverlay").classList.add("open");
+    $("dgClose").onclick = closeModal;
+    box.querySelectorAll("[data-nav]").forEach((b) => b.onclick = () => { closeModal(); nav(b.dataset.nav); });
+    return;
+  }
   document.querySelectorAll(".nav-item,.tb").forEach((el) => el.classList.toggle("active", el.dataset.page === p));
   document.querySelectorAll(".page").forEach((el) => el.classList.toggle("active", el.id === "page-" + p));
   PAGES[p]();
 }
 document.querySelectorAll(".nav-item,.tb").forEach((el) => el.onclick = () => nav(el.dataset.page));
+
+$("fabBtn").onclick = () => {
+  const box = $("modalBox");
+  box.innerHTML = `<h3>Hızlı Ekle</h3><div class="qa-menu">
+    <button class="btn btn-outline" id="qGider">🧾 Gider Ekle</button>
+    <button class="btn btn-outline" id="qAvans">💵 İşçiye Avans</button>
+    <button class="btn btn-outline" id="qTah">🏢 Müşteriden Tahsilat</button>
+    <button class="btn btn-outline" id="qBorc">🧱 Malzemeciden Alım (veresiye)</button>
+    <button class="btn btn-outline" id="qPu">🗓️ Puantaja Git</button>
+  </div><div class="actions"><button class="btn btn-outline" id="qClose">Kapat</button></div>`;
+  $("modalOverlay").classList.add("open");
+  $("qClose").onclick = closeModal;
+  $("qPu").onclick = () => { closeModal(); nav("puantaj"); };
+  $("qGider").onclick = async () => {
+    const projs = await q("projects", { order: "name", asc: true });
+    openForm("Hızlı Gider", [
+      { key: "category", label: "Kategori", type: "select", options: [{v:"malzeme",t:"Malzeme"},{v:"yakit",t:"Yakıt"},{v:"yemek",t:"Yemek"},{v:"diger",t:"Diğer"}] },
+      { key: "amount", label: "Tutar (TL)", type: "number", required: true },
+      payField,
+      { key: "project_id", label: "Proje (opsiyonel)", type: "select", options: [{v:"",t:"—"}].concat(projs.map(p=>({v:p.id,t:p.name}))) },
+      { key: "note", label: "Açıklama" },
+      { key: "photo", label: "Fiş Fotoğrafı (opsiyonel)", type: "file" },
+    ], { category: "malzeme" }, async (v) => {
+      if (!(await checkDup("expenses", { tx_date: today(), amount: v.amount, category: v.category }))) return;
+      const url = await uploadPhoto(v.photo); delete v.photo;
+      await ins("expenses", { ...v, photo_url: url, tx_date: today() }); toast("Gider eklendi");
+    });
+  };
+  $("qAvans").onclick = async () => {
+    const ws = await q("workers", { eq: { active: true }, order: "name", asc: true });
+    if (!ws.length) { toast("Önce işçi ekleyin"); return; }
+    openForm("Hızlı Avans", [
+      { key: "worker_id", label: "İşçi", type: "select", options: ws.map(w=>({v:w.id,t:w.name})), required: true },
+      { key: "amount", label: "Tutar (TL)", type: "number", required: true },
+      payField, { key: "note", label: "Açıklama" },
+    ], null, async (v) => {
+      if (!(await checkDup("advances", { tx_date: today(), amount: v.amount, worker_id: v.worker_id }))) return;
+      await ins("advances", { ...v, tx_date: today() }); toast("Avans eklendi");
+    });
+  };
+  $("qTah").onclick = async () => {
+    const cs = await q("customers", { order: "name", asc: true });
+    if (!cs.length) { toast("Önce müşteri ekleyin"); return; }
+    openForm("Hızlı Tahsilat", [
+      { key: "customer_id", label: "Müşteri", type: "select", options: cs.map(c=>({v:c.id,t:c.name})), required: true },
+      { key: "amount", label: "Tutar (TL)", type: "number", required: true },
+      payField, { key: "note", label: "Açıklama" },
+    ], null, async (v) => {
+      if (!(await checkDup("cari_tx", { tx_date: today(), amount: v.amount, customer_id: v.customer_id, direction: "tahsilat" }))) return;
+      await ins("cari_tx", { ...v, direction: "tahsilat", tx_date: today() }); toast("Tahsilat eklendi");
+    });
+  };
+  $("qBorc").onclick = () => { closeModal(); nav("malzemeci"); toast("Malzemecinin satırındaki + Alım düğmesini kullanın"); };
+};
 
 /* ---------- veri çekiciler ---------- */
 async function q(table, opts = {}) {
@@ -348,92 +473,193 @@ async function upd(table, id, row) {
   const { error } = await sb.from(table).update(row).eq("id", id);
   if (error) throw error;
 }
-function monthRange(mk) { const [y, m] = mk.split("-").map(Number); const start = `${mk}-01`; const end = new Date(y, m, 0).toISOString().slice(0, 10); return { start, end }; }
+
+/* ---------- grafik yardımcıları ---------- */
+function barRow(label, val, max, color) {
+  const w = max ? Math.max(2, Math.round(val / max * 100)) : 0;
+  return `<div class="bar-row"><span class="bl">${esc(label)}</span><div class="bwrap"><div class="bfill" style="width:${w}%;background:${color};"></div></div><span class="bv">${fmt(val)}</span></div>`;
+}
 
 /* ---------- PANEL ---------- */
 async function renderPanel() {
   const el = $("page-panel");
   el.innerHTML = `<div class="page-head"><h2>Panel</h2><span class="userbadge"><b>${esc(me.full_name)}</b> · ${me.role === "yonetici" ? "Yönetici" : "Personel"}</span></div><div class="empty">Yükleniyor…</div>`;
-  const mk = mkey(today()); const { start, end } = monthRange(mk);
-  const [att, exp, cari, adv, tlog, workers] = await Promise.all([
-    q("attendance", { gte: { work_date: start }, lte: { work_date: end } }),
-    q("expenses", { gte: { tx_date: start }, lte: { tx_date: end } }),
-    q("cari_tx", { gte: { tx_date: start }, lte: { tx_date: end } }),
-    q("advances", { gte: { tx_date: start }, lte: { tx_date: end } }),
-    q("telegram_log", { order: "created_at" }),
-    q("workers", { eq: { active: true } }),
+  const [workers, att, adv, pay, cari, sup, exp, tlog] = await Promise.all([
+    q("workers"), q("attendance"), q("advances"), q("payments"), q("cari_tx"), q("supplier_tx"), q("expenses"), q("telegram_log", { order: "created_at" }),
   ]);
-  const iscilik = att.reduce((s, a) => s + +a.wage_amount, 0);
-  const gider = exp.reduce((s, a) => s + +a.amount, 0);
-  const hakedis = cari.filter((c) => c.direction === "hakedis").reduce((s, a) => s + +a.amount, 0);
-  const tahsilat = cari.filter((c) => c.direction === "tahsilat").reduce((s, a) => s + +a.amount, 0);
-  const avans = adv.reduce((s, a) => s + +a.amount, 0);
-  const byCat = {}; exp.forEach((e) => byCat[e.category] = (byCat[e.category] || 0) + +e.amount);
-  const catNames = { malzeme: "Malzeme", yakit: "Yakıt", yemek: "Yemek", diger: "Diğer" };
+  const mk = mkey(today());
+  const inMonth = (d) => mkey(d) === mk;
+
+  // genel bakiyeler (tüm zamanlar)
+  const isciBorc = att.reduce((s,a)=>s + +a.wage_amount,0) - adv.reduce((s,a)=>s + +a.amount,0) - pay.reduce((s,a)=>s + +a.amount,0);
+  const musteriAlacak = cari.filter(c=>c.direction==="hakedis").reduce((s,a)=>s + +a.amount,0) - cari.filter(c=>c.direction==="tahsilat").reduce((s,a)=>s + +a.amount,0);
+  const malzemeciBorc = sup.filter(x=>x.direction==="borc").reduce((s,a)=>s + +a.amount,0) - sup.filter(x=>x.direction==="odeme").reduce((s,a)=>s + +a.amount,0);
+  const bekleyenFis = sup.filter(x=>x.price_pending).length;
+
+  // bu ay
+  const ayIscilik = att.filter(a=>inMonth(a.work_date)).reduce((s,a)=>s + +a.wage_amount,0);
+  const ayGider = exp.filter(x=>inMonth(x.tx_date)).reduce((s,a)=>s + +a.amount,0);
+  const ayTahsilat = cari.filter(c=>c.direction==="tahsilat"&&inMonth(c.tx_date)).reduce((s,a)=>s + +a.amount,0);
+  const ayHakedis = cari.filter(c=>c.direction==="hakedis"&&inMonth(c.tx_date)).reduce((s,a)=>s + +a.amount,0);
+
+  // 6 aylık eğilim
+  const now = new Date(); const trend = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth()-i, 1); const k = d.toISOString().slice(0,7);
+    trend.push({ mk: k,
+      gider: exp.filter(x=>mkey(x.tx_date)===k).reduce((s,a)=>s + +a.amount,0) + att.filter(a=>mkey(a.work_date)===k).reduce((s,a)=>s + +a.wage_amount,0),
+      tahsilat: cari.filter(c=>c.direction==="tahsilat"&&mkey(c.tx_date)===k).reduce((s,a)=>s + +a.amount,0) });
+  }
+  const tMax = Math.max(1, ...trend.map(t=>Math.max(t.gider,t.tahsilat)));
+
+  // kategori dağılımı (bu ay)
+  const byCat = {}; exp.filter(x=>inMonth(x.tx_date)).forEach(e=>byCat[e.category]=(byCat[e.category]||0)+ +e.amount);
+  const catNames = { malzeme:"Malzeme", yakit:"Yakıt", yemek:"Yemek", diger:"Diğer" };
+  const cMax = Math.max(1, ...Object.values(byCat), 0);
+
+  // dün puantajı girilmeyenler
+  const dun = new Date(Date.now()-864e5).toISOString().slice(0,10);
+  const dunlu = new Set(att.filter(a=>a.work_date===dun).map(a=>a.worker_id));
+  const eksik = workers.filter(w=>w.active && w.wage_type!=="maasli" && !dunlu.has(w.id)).map(w=>w.name);
+
   el.innerHTML = `
     <div class="page-head"><h2>Panel — ${mlabel(mk)}</h2><span class="userbadge"><b>${esc(me.full_name)}</b> · ${me.role === "yonetici" ? "Yönetici" : "Personel"}</span></div>
     <div class="grid c4">
-      <div class="stat"><div class="lbl">Hakediş (Gelir)</div><div class="val v-green">${fmt(hakedis)}</div></div>
-      <div class="stat"><div class="lbl">Tahsilat</div><div class="val v-amber">${fmt(tahsilat)}</div></div>
-      <div class="stat"><div class="lbl">İşçilik</div><div class="val v-steel">${fmt(iscilik)}</div></div>
-      <div class="stat"><div class="lbl">Giderler</div><div class="val v-red">${fmt(gider)}</div></div>
+      <div class="stat"><div class="lbl">İşçilere Borç (net)</div><div class="val v-steel">${fmtS(isciBorc)}</div></div>
+      <div class="stat"><div class="lbl">Müşteriden Alacak</div><div class="val v-amber">${fmtS(musteriAlacak)}</div></div>
+      <div class="stat"><div class="lbl">Malzemeciye Borç</div><div class="val v-red">${fmtS(malzemeciBorc)}</div></div>
+      <div class="stat"><div class="lbl">Bu Ay Hakediş</div><div class="val v-green">${fmt(ayHakedis)}</div></div>
     </div>
-    <div class="panel"><h3>Bu Ay Gider Dağılımı</h3>
-      ${Object.keys(byCat).length ? Object.entries(byCat).map(([k, v]) => `<div style="display:flex;justify-content:space-between;padding:5px 0;"><span>${catNames[k] || k}</span><b class="mono">${fmt(v)}</b></div>`).join("") : '<div class="empty">Bu ay gider yok</div>'}
-      <div style="display:flex;justify-content:space-between;padding:8px 0 0;border-top:1px solid var(--border);margin-top:6px;"><span>Verilen Avans</span><b class="mono">${fmt(avans)}</b></div>
+    ${eksik.length ? `<div class="panel" style="border-color:var(--amber);"><h3>⚠️ Dün (${dstr(dun)}) puantajı girilmeyenler</h3><div style="font-size:13px;">${eksik.map(esc).join(", ")} — <a href="#" onclick="nav('puantaj');return false;" style="color:var(--amber);">Puantaja git</a></div></div>` : ""}
+    ${bekleyenFis ? `<div class="panel"><h3>🧾 Fiyat bekleyen teslim fişi: ${bekleyenFis} adet</h3><div style="font-size:12.5px;color:var(--dim);">Malzemeciler sayfasından tutarlarını girebilirsiniz.</div></div>` : ""}
+    <div class="panel"><h3>Son 6 Ay — Gider+İşçilik vs Tahsilat</h3>
+      <div class="legend"><span><span class="dot" style="background:var(--danger);"></span>Gider+İşçilik</span><span><span class="dot" style="background:var(--green);"></span>Tahsilat</span></div>
+      ${trend.map(t=>barRow(mshort(t.mk), t.gider, tMax, "var(--danger)") + barRow("", t.tahsilat, tMax, "var(--green)")).join("")}
     </div>
+    <div class="panel"><h3>Bu Ay Gider Dağılımı (işçilik hariç: ${fmt(ayGider)} · işçilik: ${fmt(ayIscilik)})</h3>
+      ${Object.keys(byCat).length ? Object.entries(byCat).map(([k,v])=>barRow(catNames[k]||k, v, cMax, "var(--steel)")).join("") : '<div class="empty">Bu ay gider yok</div>'}
+    </div>
+    <div class="panel"><h3>Bu Ay Tahsilat</h3><div class="val mono v-green" style="font-size:17px;">${fmt(ayTahsilat)}</div></div>
     <div class="panel"><h3>Telegram'dan Son Gelenler</h3>
-      ${tlog.slice(0, 8).map((l) => `<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12.5px;"><span style="color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(l.message)}</span><span class="pill">${dstr(l.created_at)}</span></div>`).join("") || '<div class="empty">Telegram bağlantısı henüz kayıt göndermedi. Kurulum rehberindeki Telegram adımlarını izleyin.</div>'}
-    </div>
-    <div class="panel"><h3>Aktif İşçi</h3><div>${workers.length} işçi kayıtlı — bugünkü puantaj için <a href="#" onclick="nav('puantaj');return false;" style="color:var(--amber);">Puantaj sayfasına</a> gidin.</div></div>`;
+      ${tlog.slice(0,8).map(l=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12.5px;"><span style="color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(l.message)}</span><span class="pill">${dstr(l.created_at)}</span></div>`).join("") || '<div class="empty">Telegram henüz kayıt göndermedi.</div>'}
+    </div>`;
 }
 
-/* ---------- PUANTAJ ---------- */
+/* ---------- PUANTAJ (günlük + geçmiş takvimi) ---------- */
 async function renderPuantaj() {
   const el = $("page-puantaj");
-  el.innerHTML = `<div class="page-head"><h2>Puantaj</h2></div>
-    <div class="searchrow"><input type="date" id="puDate" value="${today()}" style="max-width:170px;"><button class="btn btn-outline btn-sm" id="puReload">Getir</button></div>
-    <div id="puList" class="empty">Yükleniyor…</div>
-    <div style="margin-top:12px;"><button class="btn btn-amber" id="puSave">Seçilenleri Kaydet</button></div>
-    <div class="panel"><h3>Nasıl çalışır?</h3><div style="font-size:12.5px;color:var(--dim);line-height:1.6;">İşe gelen işçilerin kartına dokunun (yeşile döner), sonra Kaydet'e basın. O günün yevmiyesi otomatik olarak hem işçinin hakedişine hem de atandığı projenin maliyetine yazılır. Zaten kayıtlı günler ✓ ile işaretlidir; tekrar kaydedilmez. Yanlış girilen günü karttaki ✕ ile silebilirsiniz.</div></div>`;
-  const load = async () => {
+  el.innerHTML = `<div class="page-head"><h2>Puantaj</h2><button class="btn btn-outline btn-sm" id="puCalBtn">📅 Geçmiş Takvimi</button></div>
+    <div id="puDay">
+      <div class="searchrow"><input type="date" id="puDate" value="${today()}" style="max-width:170px;"><button class="btn btn-outline btn-sm" id="puReload">Getir</button></div>
+      <div id="puList" class="empty">Yükleniyor…</div>
+    </div>
+    <div id="puCal" style="display:none;">
+      <div class="searchrow"><select id="calWorker" style="max-width:200px;"></select><select id="calMonth" style="max-width:160px;">${monthOptions(mkey(today()))}</select></div>
+      <div class="cal-head"><span>Pt</span><span>Sa</span><span>Ça</span><span>Pe</span><span>Cu</span><span>Ct</span><span>Pz</span></div>
+      <div class="cal-grid" id="calGrid"></div>
+      <div style="font-size:11.5px;color:var(--dim);margin-top:8px;">Bir güne dokunun: kayıtları görür, ekler veya silersiniz. Yeşil = tam gün ve üzeri, sarı = yarım/kısmi.</div>
+    </div>
+    <div class="panel"><h3>Nasıl çalışır?</h3><div style="font-size:12.5px;color:var(--dim);line-height:1.6;">İşçinin o gün çalıştığı projeyi ve süreyi (tam / yarım / mesaili 1,5) seçip Ekle'ye basın. Aynı güne iki farklı projede yarımşar gün girilebilir; günün toplamı 1,5'i aşamaz. Yevmiye orana göre hesaplanır ve projenin maliyetine yazılır. Girilemeyen eski günler için Geçmiş Takvimi'ni kullanın.</div></div>`;
+
+  const projs = await q("projects", { order: "name", asc: true });
+  const workers = await q("workers", { eq: { active: true }, order: "name", asc: true });
+  const pName = {}; projs.forEach((p) => pName[p.id] = p.name);
+  let calMode = false;
+
+  const projSel = (id, sel) => `<select data-ps="${id}" style="max-width:170px;">${projs.length ? projs.map((p) => `<option value="${p.id}" ${p.id === sel ? "selected" : ""}>${esc(p.name)}</option>`).join("") : '<option value="">Önce proje ekleyin</option>'}</select>`;
+  const frSel = (id) => `<select data-fs="${id}" style="max-width:120px;">${FR_OPTS.map((f) => `<option value="${f.v}">${f.t}</option>`).join("")}</select>`;
+
+  async function addAtt(w, dateStr, projectId, fraction) {
+    if (!w.daily_wage) { toast(w.name + " için yevmiye tanımlı değil — İşçiler sayfasından girin"); return false; }
+    if (!projectId) { toast("Proje seçin (Projeler sayfasından proje ekleyebilirsiniz)"); return false; }
+    const mine = await q("attendance", { eq: { worker_id: w.id, work_date: dateStr } });
+    const sum = mine.reduce((s, a) => s + +(a.fraction || 1), 0);
+    if (sum + fraction > 1.5) { toast("Bu günün toplamı 1,5 günü aşamaz (mevcut: " + frLabel(sum) + ")"); return false; }
+    if (mine.some((a) => a.project_id === projectId)) { toast("Bu projeye bu gün için zaten kayıt var"); return false; }
+    try {
+      await ins("attendance", { worker_id: w.id, project_id: projectId, work_date: dateStr, fraction, wage_amount: Math.round(w.daily_wage * fraction * 100) / 100 });
+      return true;
+    } catch (e) { toast("Eklenemedi: " + (e.message || e)); return false; }
+  }
+
+  async function loadDay() {
     const d = $("puDate").value;
-    const [workers, att] = await Promise.all([q("workers", { eq: { active: true }, order: "name", asc: true }), q("attendance", { eq: { work_date: d } })]);
-    const attBy = {}; att.forEach((a) => attBy[a.worker_id] = a);
-    const projs = await q("projects"); const pName = {}; projs.forEach((p) => pName[p.id] = p.name);
+    const att = await q("attendance", { eq: { work_date: d } });
     if (!workers.length) { $("puList").innerHTML = '<div class="empty">Aktif işçi yok. Önce İşçiler sayfasından ekleyin.</div>'; return; }
     $("puList").innerHTML = workers.map((w) => {
-      const done = attBy[w.id];
-      return `<div class="att-chip ${done ? "on" : ""}" data-wid="${w.id}" data-done="${done ? done.id : ""}">
-        <span>${done ? "✓" : "○"}</span>
-        <span><span class="nm">${esc(w.name)}</span><br><span class="wg">${fmt(w.daily_wage)} · ${esc(pName[w.project_id] || "proje yok")}</span></span>
-        ${done ? `<span class="btn btn-danger btn-sm" data-delatt="${done.id}">✕</span>` : ""}
-      </div>`;
+      const mine = att.filter((a) => a.worker_id === w.id);
+      const sum = mine.reduce((s, a) => s + +(a.fraction || 1), 0);
+      const rows = mine.map((a) => `<div class="p-sub" style="display:flex;justify-content:space-between;align-items:center;">✓ ${esc(pName[a.project_id] || "?")} · ${frLabel(a.fraction || 1)} gün <span class="btn btn-danger btn-sm" data-da="${a.id}">🗑</span></div>`).join("");
+      const addRow = sum < 1.5 ? `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:7px;">${projSel(w.id, w.project_id)}${frSel(w.id)}<button class="btn btn-green btn-sm" data-mk="${w.id}">Ekle</button></div>` : "";
+      return `<div class="item-card" style="flex-direction:column;align-items:stretch;">
+        <div style="display:flex;justify-content:space-between;"><b>${esc(w.name)}</b><span class="p-sub">${fmt(w.daily_wage)}${sum ? " · bugün " + frLabel(sum) + " gün" : ""}</span></div>
+        ${rows}${addRow}</div>`;
     }).join("");
-    $("puList").querySelectorAll(".att-chip").forEach((c) => c.onclick = (e) => {
-      if (e.target.dataset.delatt) { del("attendance", e.target.dataset.delatt, load); return; }
-      if (c.dataset.done) { toast("Bu gün zaten kayıtlı"); return; }
-      c.classList.toggle("on");
+    $("puList").querySelectorAll("[data-da]").forEach((b) => b.onclick = () => delAtt(b.dataset.da, loadDay));
+    $("puList").querySelectorAll("[data-mk]").forEach((b) => b.onclick = async () => {
+      const w = workers.find((x) => x.id === b.dataset.mk);
+      const ps = $("puList").querySelector(`[data-ps="${w.id}"]`);
+      const fs = $("puList").querySelector(`[data-fs="${w.id}"]`);
+      b.disabled = true;
+      if (await addAtt(w, $("puDate").value, ps ? ps.value : null, parseFloat(fs.value))) toast(w.name + " eklendi");
+      loadDay();
     });
-  };
-  $("puReload").onclick = load;
-  $("puSave").onclick = async () => {
-    const d = $("puDate").value;
-    const chips = [...$("puList").querySelectorAll(".att-chip.on")].filter((c) => !c.dataset.done);
-    if (!chips.length) { toast("Kaydedilecek yeni seçim yok"); return; }
-    const workers = await q("workers", { eq: { active: true } });
-    const wBy = {}; workers.forEach((w) => wBy[w.id] = w);
-    let ok = 0, fail = 0;
-    for (const c of chips) {
-      const w = wBy[c.dataset.wid]; if (!w) continue;
-      if (!w.daily_wage) { toast(w.name + " için yevmiye tanımlı değil — İşçiler sayfasından girin"); fail++; continue; }
-      try { await ins("attendance", { worker_id: w.id, project_id: w.project_id, work_date: d, wage_amount: w.daily_wage }); ok++; }
-      catch (e) { fail++; }
+  }
+
+  function calCells(mk) { const [y, m] = mk.split("-").map(Number); const first = new Date(y, m - 1, 1); return { days: new Date(y, m, 0).getDate(), startIdx: (first.getDay() + 6) % 7 }; }
+  async function loadCal() {
+    const wid = $("calWorker").value;
+    if (!wid) { $("calGrid").innerHTML = ""; return; }
+    const mk = $("calMonth").value; const { start, end } = monthRange(mk);
+    const att = await q("attendance", { eq: { worker_id: wid }, gte: { work_date: start }, lte: { work_date: end } });
+    const by = {}; att.forEach((a) => { const d = +a.work_date.slice(8, 10); (by[d] = by[d] || []).push(a); });
+    const { days, startIdx } = calCells(mk);
+    let html = ""; for (let i = 0; i < startIdx; i++) html += "<div></div>";
+    for (let d = 1; d <= days; d++) {
+      const list = by[d] || [];
+      const sum = list.reduce((s, a) => s + +(a.fraction || 1), 0);
+      const cls = sum >= 1 ? "full" : (sum > 0 ? "half" : "off");
+      html += `<div class="cal-cell ${cls}" data-day="${d}"><span class="dnum">${d}</span><span class="dst">${sum ? frLabel(sum) : ""}</span></div>`;
     }
-    toast(`${ok} kayıt eklendi${fail ? ", " + fail + " eklenemedi" : ""}`);
-    load();
+    $("calGrid").innerHTML = html;
+    $("calGrid").querySelectorAll("[data-day]").forEach((c) => c.onclick = () => dayModal(wid, mk, +c.dataset.day));
+  }
+  async function dayModal(wid, mk, day) {
+    const w = workers.find((x) => x.id === wid);
+    const dateStr = mk + "-" + String(day).padStart(2, "0");
+    const list = await q("attendance", { eq: { worker_id: wid, work_date: dateStr } });
+    const sum = list.reduce((s, a) => s + +(a.fraction || 1), 0);
+    const box = $("modalBox");
+    box.innerHTML = `<h3>${esc(w.name)} — ${day} ${mlabel(mk)}</h3>
+      ${list.map((a) => `<div class="tx-item"><div>${esc(pName[a.project_id] || "?")} · ${frLabel(a.fraction || 1)} gün</div><div class="tx-del" data-x="${a.id}">✕</div></div>`).join("") || '<div class="empty">Kayıt yok (izinli / boş gün)</div>'}
+      ${sum < 1.5 ? `<div style="display:flex;gap:6px;margin-top:12px;flex-wrap:wrap;">${projSel("cal", w.project_id)}${frSel("cal")}<button class="btn btn-green btn-sm" id="calAdd">Ekle</button></div>` : ""}
+      <div class="actions"><button class="btn btn-outline" id="calClose">Kapat</button></div>`;
+    $("modalOverlay").classList.add("open");
+    $("calClose").onclick = closeModal;
+    box.querySelectorAll("[data-x]").forEach((b) => b.onclick = async () => {
+      if (!(await confirmDel("Bu puantaj kaydı silinsin mi?"))) return;
+      await sb.from("attendance").delete().eq("id", b.dataset.x);
+      dayModal(wid, mk, day); loadCal();
+    });
+    const ab = $("calAdd");
+    if (ab) ab.onclick = async () => {
+      const ps = box.querySelector('[data-ps="cal"]'), fs = box.querySelector('[data-fs="cal"]');
+      if (await addAtt(w, dateStr, ps ? ps.value : null, parseFloat(fs.value))) { dayModal(wid, mk, day); loadCal(); }
+    };
+  }
+
+  $("puCalBtn").onclick = () => {
+    calMode = !calMode;
+    $("puDay").style.display = calMode ? "none" : "block";
+    $("puCal").style.display = calMode ? "block" : "none";
+    $("puCalBtn").textContent = calMode ? "📋 Günlük Giriş" : "📅 Geçmiş Takvimi";
+    if (calMode) loadCal();
   };
-  load();
+  $("calWorker").innerHTML = workers.map((w) => `<option value="${w.id}">${esc(w.name)}</option>`).join("");
+  $("calWorker").onchange = loadCal;
+  $("calMonth").onchange = loadCal;
+  $("puReload").onclick = loadDay;
+  loadDay();
 }
 
 /* ---------- İŞÇİLER ---------- */
@@ -450,7 +676,7 @@ async function renderIsciler() {
     { key: "wage_type", label: "Ücret Tipi", type: "select", options: [{ v: "yevmiyeli", t: "Yevmiyeli" }, { v: "maasli", t: "Maaşlı" }] },
     { key: "daily_wage", label: "Günlük Yevmiye (TL)", type: "number" },
     { key: "monthly_salary", label: "Aylık Maaş (TL, maaşlıysa)", type: "number" },
-    { key: "project_id", label: "Çalıştığı Proje", type: "select", options: projOpts },
+    { key: "project_id", label: "Varsayılan Proje", type: "select", options: projOpts },
     { key: "active", label: "Durum", type: "select", options: [{ v: "true", t: "Aktif" }, { v: "false", t: "Ayrıldı" }] },
   ];
   const load = async () => {
@@ -464,6 +690,7 @@ async function renderIsciler() {
     const s = ($("wSearch").value || "").toLowerCase();
     const rows = workers.filter((w) => w.name.toLowerCase().includes(s)).map((w) => {
       const days = att.filter((a) => a.worker_id === w.id);
+      const gun = days.reduce((x, a) => x + +(a.fraction || 1), 0);
       const brut = w.wage_type === "maasli" ? +w.monthly_salary : days.reduce((x, a) => x + +a.wage_amount, 0);
       const a = adv.filter((x) => x.worker_id === w.id).reduce((x, y) => x + +y.amount, 0);
       const p = pay.filter((x) => x.worker_id === w.id).reduce((x, y) => x + +y.amount, 0);
@@ -471,7 +698,7 @@ async function renderIsciler() {
       return `<tr>
         <td><b>${esc(w.name)}</b>${w.active ? "" : ' <span class="pill">ayrıldı</span>'}<br><span class="pill">${esc(pName[w.project_id] || "proje yok")}</span></td>
         <td class="mono">${w.wage_type === "maasli" ? fmt(w.monthly_salary) + "/ay" : fmt(w.daily_wage)}</td>
-        <td class="mono">${w.wage_type === "maasli" ? "—" : days.length + " gün"}</td>
+        <td class="mono">${w.wage_type === "maasli" ? "—" : String(gun).replace(".", ",") + " gün"}</td>
         <td class="mono">${fmt(brut)}</td>
         <td class="mono v-steel">${fmt(a)}</td>
         <td class="mono v-green">${fmt(p)}</td>
@@ -485,16 +712,41 @@ async function renderIsciler() {
     }).join("");
     $("wTable").innerHTML = rows ? `<table class="tbl"><tr><th>İşçi</th><th>Ücret</th><th>Gün</th><th>Brüt Hakediş</th><th>Avans</th><th>Ödenen</th><th>Net Kalan</th><th></th></tr>${rows}</table>` : '<div class="empty">İşçi bulunamadı</div>';
     const wBy = {}; workers.forEach((w) => wBy[w.id] = w);
+
+    // işten ayrılma kapanış akışı
+    async function closeoutIfLeaving(w, vals) {
+      if (!(w.active && vals.active === "false")) return;
+      const [allAtt, allAdv, allPay] = await Promise.all([
+        q("attendance", { eq: { worker_id: w.id } }), q("advances", { eq: { worker_id: w.id } }), q("payments", { eq: { worker_id: w.id } }),
+      ]);
+      const brut = w.wage_type === "maasli" ? 0 : allAtt.reduce((x, a) => x + +a.wage_amount, 0);
+      const net = brut - allAdv.reduce((x, a) => x + +a.amount, 0) - allPay.reduce((x, a) => x + +a.amount, 0);
+      if (net > 0 && window.confirm(`${w.name} ayrılıyor. Tüm zamanlar net alacağı: ${fmt(net)}.\n\nKapanış ödemesi olarak bu tutar şimdi işlensin mi?`)) {
+        await ins("payments", { worker_id: w.id, amount: net, tx_date: today(), note: "Kapanış ödemesi (işten ayrılış)" });
+        toast("Kapanış ödemesi işlendi");
+      } else if (net !== 0) {
+        toast(`Dikkat: ${w.name} ${net > 0 ? fmt(net) + " alacakla" : fmt(net) + " borçla"} ayrılıyor`);
+      }
+    }
+
     $("wTable").querySelectorAll("[data-edit]").forEach((b) => b.onclick = () => {
       const w = wBy[b.dataset.edit];
-      openForm("İşçiyi Düzenle", wFields, w, async (v) => { v.active = v.active === "true"; await upd("workers", w.id, v); toast("Güncellendi"); load(); });
+      openForm("İşçiyi Düzenle", wFields, w, async (v) => {
+        await closeoutIfLeaving(w, v);
+        v.active = v.active === "true";
+        await upd("workers", w.id, v); toast("Güncellendi"); load();
+      });
     });
     $("wTable").querySelectorAll("[data-del]").forEach((b) => b.onclick = () => del("workers", b.dataset.del, load));
     const txForm = (wid, table, title) => openForm(title, [
       { key: "amount", label: "Tutar (TL)", type: "number", required: true },
       { key: "tx_date", label: "Tarih", type: "date", def: today() },
+      payField,
       { key: "note", label: "Açıklama" },
-    ], null, async (v) => { await ins(table, { worker_id: wid, ...v }); toast("Kaydedildi"); load(); });
+    ], null, async (v) => {
+      if (!(await checkDup(table, { worker_id: wid, tx_date: v.tx_date, amount: v.amount }))) return;
+      await ins(table, { worker_id: wid, ...v }); toast("Kaydedildi"); load();
+    });
     $("wTable").querySelectorAll("[data-avans]").forEach((b) => b.onclick = () => txForm(b.dataset.avans, "advances", wBy[b.dataset.avans].name + " — Avans"));
     $("wTable").querySelectorAll("[data-ode]").forEach((b) => b.onclick = () => txForm(b.dataset.ode, "payments", wBy[b.dataset.ode].name + " — Ödeme"));
   };
@@ -503,50 +755,7 @@ async function renderIsciler() {
   load();
 }
 
-/* ---------- PROJELER ---------- */
-async function renderProjeler() {
-  const el = $("page-projeler");
-  el.innerHTML = `<div class="page-head"><h2>Projeler — Kâr / Zarar</h2><button class="btn btn-amber btn-sm" id="pAdd">+ Yeni Proje</button></div><div id="pList" class="empty">Yükleniyor…</div>`;
-  const pFields = [
-    { key: "name", label: "Proje Adı", required: true },
-    { key: "customer", label: "Müşteri / İşveren" },
-    { key: "contract_amount", label: "Sözleşme Tutarı (TL)", type: "number" },
-    { key: "status", label: "Durum", type: "select", options: [{ v: "aktif", t: "Aktif" }, { v: "tamamlandi", t: "Tamamlandı" }, { v: "beklemede", t: "Beklemede" }] },
-  ];
-  const load = async () => {
-    const [projs, att, exp, cari, subtx] = await Promise.all([
-      q("projects", { order: "created_at" }), q("attendance"), q("expenses"), q("cari_tx"), q("sub_tx"),
-    ]);
-    if (!projs.length) { $("pList").innerHTML = '<div class="empty">Henüz proje yok. "+ Yeni Proje" ile başlayın.</div>'; }
-    else {
-      $("pList").innerHTML = projs.map((p) => {
-        const isc = att.filter((a) => a.project_id === p.id).reduce((s, a) => s + +a.wage_amount, 0);
-        const gid = exp.filter((a) => a.project_id === p.id).reduce((s, a) => s + +a.amount, 0);
-        const tas = subtx.filter((a) => a.project_id === p.id && a.direction === "hakedis").reduce((s, a) => s + +a.amount, 0);
-        const gel = cari.filter((a) => a.project_id === p.id && a.direction === "hakedis").reduce((s, a) => s + +a.amount, 0);
-        const net = gel - isc - gid - tas;
-        return `<div class="panel" style="margin-top:12px;">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">
-            <div><b style="font-size:15px;">${esc(p.name)}</b> <span class="pill">${p.status}</span><br><span style="font-size:12px;color:var(--dim);">${esc(p.customer || "")} ${p.contract_amount ? "· Sözleşme: " + fmt(p.contract_amount) : ""}</span></div>
-            <div class="rowact"><button class="btn btn-outline btn-sm" data-edit="${p.id}">✎</button><button class="btn btn-danger btn-sm" data-del="${p.id}">🗑</button></div>
-          </div>
-          <div class="grid c4" style="margin-top:10px;">
-            <div class="stat"><div class="lbl">Gelir (Hakediş)</div><div class="val v-green">${fmt(gel)}</div></div>
-            <div class="stat"><div class="lbl">İşçilik</div><div class="val v-steel">${fmt(isc)}</div></div>
-            <div class="stat"><div class="lbl">Gider + Taşeron</div><div class="val v-red">${fmt(gid + tas)}</div></div>
-            <div class="stat"><div class="lbl">Net</div><div class="val ${net >= 0 ? "v-green" : "v-red"}">${fmtS(net)}</div></div>
-          </div></div>`;
-      }).join("");
-    }
-    const pBy = {}; projs.forEach((p) => pBy[p.id] = p);
-    $("pList").querySelectorAll("[data-edit]").forEach((b) => b.onclick = () => openForm("Projeyi Düzenle", pFields, pBy[b.dataset.edit], async (v) => { await upd("projects", b.dataset.edit, v); toast("Güncellendi"); load(); }));
-    $("pList").querySelectorAll("[data-del]").forEach((b) => b.onclick = () => del("projects", b.dataset.del, load));
-  };
-  $("pAdd").onclick = () => openForm("Yeni Proje", pFields, { status: "aktif" }, async (v) => { await ins("projects", v); toast("Proje eklendi"); load(); });
-  load();
-}
-
-/* ---------- CARİ ---------- */
+/* ---------- CARİ / MÜŞTERİLER ---------- */
 async function renderCari() {
   const el = $("page-cari");
   el.innerHTML = `<div class="page-head"><h2>Cari / Müşteriler</h2><button class="btn btn-amber btn-sm" id="cAdd">+ Yeni Müşteri</button></div>
@@ -560,7 +769,7 @@ async function renderCari() {
       const hak = mine.filter((t) => t.direction === "hakedis").reduce((x, t) => x + +t.amount, 0);
       const tah = mine.filter((t) => t.direction === "tahsilat").reduce((x, t) => x + +t.amount, 0);
       const bak = hak - tah;
-      const rows = mine.slice(0, 6).map((t) => `<tr><td>${dstr(t.tx_date)}</td><td>${t.direction === "hakedis" ? '<span class="pill">hakediş</span>' : '<span class="pill" style="color:var(--green);">tahsilat</span>'}</td><td>${esc(t.note || "")}</td><td class="pill">${esc(t.created_by || "")}</td><td class="mono">${fmt(t.amount)}</td><td class="rowact"><button class="btn btn-danger btn-sm" data-deltx="${t.id}">🗑</button></td></tr>`).join("");
+      const rows = mine.slice(0, 6).map((t) => `<tr><td>${dstr(t.tx_date)}</td><td>${t.direction === "hakedis" ? '<span class="pill">hakediş</span>' : '<span class="pill" style="color:var(--green);">tahsilat</span>'}</td><td>${esc(t.note || "")}${t.payment_method ? ' <span class="pill">' + t.payment_method + "</span>" : ""}</td><td class="pill">${esc(t.created_by || "")}</td><td class="mono">${fmt(t.amount)}</td><td class="rowact"><button class="btn btn-danger btn-sm" data-deltx="${t.id}">🗑</button></td></tr>`).join("");
       return `<div class="panel" style="margin-top:12px;">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
           <div><b>${esc(c.name)}</b> ${c.phone ? '<span class="pill">' + esc(c.phone) + "</span>" : ""}<br>
@@ -576,9 +785,13 @@ async function renderCari() {
     const txForm = (cid, dir) => openForm(dir === "hakedis" ? "Hakediş / Fatura Ekle" : "Tahsilat Ekle", [
       { key: "amount", label: "Tutar (TL)", type: "number", required: true },
       { key: "tx_date", label: "Tarih", type: "date", def: today() },
+      payField,
       { key: "project_id", label: "Proje (kâr/zarar için)", type: "select", options: projOpts },
       { key: "note", label: "Açıklama" },
-    ], null, async (v) => { await ins("cari_tx", { customer_id: cid, direction: dir, ...v }); toast("Kaydedildi"); load(); });
+    ], null, async (v) => {
+      if (!(await checkDup("cari_tx", { customer_id: cid, tx_date: v.tx_date, amount: v.amount, direction: dir }))) return;
+      await ins("cari_tx", { customer_id: cid, direction: dir, ...v }); toast("Kaydedildi"); load();
+    });
     $("cList").querySelectorAll("[data-hak]").forEach((b) => b.onclick = () => txForm(b.dataset.hak, "hakedis"));
     $("cList").querySelectorAll("[data-tah]").forEach((b) => b.onclick = () => txForm(b.dataset.tah, "tahsilat"));
     $("cList").querySelectorAll("[data-del]").forEach((b) => b.onclick = () => del("customers", b.dataset.del, load));
@@ -592,6 +805,90 @@ async function renderCari() {
   load();
 }
 
+/* ---------- MALZEMECİLER (tedarikçi carisi) ---------- */
+async function renderMalzemeci() {
+  const el = $("page-malzemeci");
+  el.innerHTML = `<div class="page-head"><h2>Malzemeciler</h2><button class="btn btn-amber btn-sm" id="spAdd">+ Yeni Malzemeci</button></div>
+    <div class="searchrow"><input id="spSearch" placeholder="Malzemeci ara…"></div><div id="spList" class="empty">Yükleniyor…</div>`;
+  const projs = await q("projects"); const projOpts = [{ v: "", t: "Proje yok" }].concat(projs.map((p) => ({ v: p.id, t: p.name })));
+  const pName = {}; projs.forEach((p) => pName[p.id] = p.name);
+  const load = async () => {
+    const [sups, txs] = await Promise.all([q("suppliers", { order: "name", asc: true }), q("supplier_tx", { order: "tx_date" })]);
+    const s = ($("spSearch").value || "").toLowerCase();
+    $("spList").innerHTML = sups.filter((x) => x.name.toLowerCase().includes(s)).map((sp) => {
+      const mine = txs.filter((t) => t.supplier_id === sp.id);
+      const borc = mine.filter((t) => t.direction === "borc").reduce((x, t) => x + +t.amount, 0);
+      const ode = mine.filter((t) => t.direction === "odeme").reduce((x, t) => x + +t.amount, 0);
+      const kalan = borc - ode;
+      const bekleyen = mine.filter((t) => t.price_pending).length;
+      const rows = mine.slice(0, 8).map((t) => `<tr>
+        <td>${dstr(t.tx_date)}</td>
+        <td>${t.direction === "borc" ? '<span class="pill">alım</span>' : '<span class="pill" style="color:var(--green);">ödeme</span>'}${t.price_pending ? ' <span class="pending">fiyat bekliyor</span>' : ""}</td>
+        <td>${esc(t.note || "")}${t.project_id ? ' <span class="pill">' + esc(pName[t.project_id] || "") + "</span>" : ""}${t.payment_method ? ' <span class="pill">' + t.payment_method + "</span>" : ""}</td>
+        <td>${t.photo_url ? `<a href="${t.photo_url}" target="_blank" style="color:var(--steel);">📎 fiş</a>` : ""}</td>
+        <td class="mono">${fmt(t.amount)}</td>
+        <td class="rowact"><button class="btn btn-outline btn-sm" data-edittx="${t.id}">✎</button><button class="btn btn-danger btn-sm" data-deltx="${t.id}">🗑</button></td></tr>`).join("");
+      return `<div class="panel" style="margin-top:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+          <div><b>${esc(sp.name)}</b> ${sp.phone ? '<span class="pill">' + esc(sp.phone) + "</span>" : ""}${bekleyen ? ' <span class="pending">' + bekleyen + " fiş fiyat bekliyor</span>" : ""}<br>
+            <span style="font-size:12px;color:var(--dim);">Alım ${fmt(borc)} · Ödenen ${fmt(ode)} · </span>
+            <b class="mono ${kalan > 0 ? "v-red" : "v-green"}">Kalan borcumuz: ${fmt(kalan)}</b></div>
+          <div class="rowact">
+            <button class="btn btn-amber btn-sm" data-alim="${sp.id}">+ Alım</button>
+            <button class="btn btn-green btn-sm" data-ode="${sp.id}">+ Ödeme</button>
+            <button class="btn btn-danger btn-sm" data-del="${sp.id}">🗑</button>
+          </div></div>
+        ${rows ? `<div class="tblwrap" style="margin-top:8px;"><table class="tbl">${rows}</table></div>` : ""}</div>`;
+    }).join("") || '<div class="empty">Malzemeci yok. "+ Yeni Malzemeci" ile başlayın.</div>';
+
+    const txBy = {}; txs.forEach((t) => txBy[t.id] = t);
+    const alimForm = (sid, existing) => openForm(existing ? "Alımı Düzenle" : "Veresiye Alım (borçlanma)", [
+      { key: "price_pending", label: "Fiyat durumu", type: "select", options: [{ v: "0", t: "Fiyat belli (tutar girilecek)" }, { v: "1", t: "Fiyat sonra belli olacak (teslim fişi)" }] },
+      { key: "amount", label: "Tutar (TL — fiyat bekliyorsa 0 bırakın)", type: "number" },
+      { key: "tx_date", label: "Tarih", type: "date", def: today() },
+      { key: "project_id", label: "Proje (maliyet için)", type: "select", options: projOpts },
+      { key: "note", label: "Açıklama (ne alındı)" },
+      { key: "photo", label: "Teslim fişi / fatura fotoğrafı", type: "file" },
+    ], existing ? { ...existing, price_pending: existing.price_pending ? "1" : "0" } : { price_pending: "0" }, async (v) => {
+      const pending = v.price_pending === "1";
+      const amount = pending ? (v.amount || 0) : v.amount;
+      if (!pending && (!amount || amount <= 0)) { toast("Tutar gerekli (ya da 'fiyat sonra' seçin)"); return; }
+      const url = v.photo ? await uploadPhoto(v.photo) : null;
+      const row = { amount: amount || 0, tx_date: v.tx_date, project_id: v.project_id, note: v.note, price_pending: pending };
+      if (url) row.photo_url = url;
+      if (existing) { await upd("supplier_tx", existing.id, row); toast("Güncellendi"); }
+      else {
+        if (!(await checkDup("supplier_tx", { supplier_id: sid, tx_date: v.tx_date, amount: row.amount, direction: "borc" }))) return;
+        await ins("supplier_tx", { supplier_id: sid, direction: "borc", ...row }); toast("Alım kaydedildi");
+      }
+      load();
+    });
+    const odeForm = (sid) => openForm("Malzemeciye Ödeme", [
+      { key: "amount", label: "Tutar (TL)", type: "number", required: true },
+      { key: "tx_date", label: "Tarih", type: "date", def: today() },
+      payField, { key: "note", label: "Açıklama" },
+    ], null, async (v) => {
+      if (!(await checkDup("supplier_tx", { supplier_id: sid, tx_date: v.tx_date, amount: v.amount, direction: "odeme" }))) return;
+      await ins("supplier_tx", { supplier_id: sid, direction: "odeme", ...v }); toast("Ödeme kaydedildi"); load();
+    });
+    $("spList").querySelectorAll("[data-alim]").forEach((b) => b.onclick = () => alimForm(b.dataset.alim, null));
+    $("spList").querySelectorAll("[data-ode]").forEach((b) => b.onclick = () => odeForm(b.dataset.ode));
+    $("spList").querySelectorAll("[data-edittx]").forEach((b) => b.onclick = () => {
+      const t = txBy[b.dataset.edittx];
+      if (t.direction === "borc") alimForm(t.supplier_id, t);
+      else toast("Ödemeler düzenlenemez; silip yeniden ekleyin");
+    });
+    $("spList").querySelectorAll("[data-deltx]").forEach((b) => b.onclick = () => del("supplier_tx", b.dataset.deltx, load));
+    $("spList").querySelectorAll("[data-del]").forEach((b) => b.onclick = () => del("suppliers", b.dataset.del, load));
+  };
+  $("spAdd").onclick = () => openForm("Yeni Malzemeci", [
+    { key: "name", label: "Firma / Kişi Adı", required: true },
+    { key: "phone", label: "Telefon" }, { key: "note", label: "Not" },
+  ], null, async (v) => { await ins("suppliers", v); toast("Malzemeci eklendi"); load(); });
+  $("spSearch").oninput = load;
+  load();
+}
+
 /* ---------- GİDERLER ---------- */
 async function renderGiderler() {
   const el = $("page-giderler");
@@ -599,15 +896,18 @@ async function renderGiderler() {
     <div class="searchrow">
       <select id="gCat" style="max-width:150px;"><option value="">Tüm kategoriler</option><option value="malzeme">Malzeme</option><option value="yakit">Yakıt</option><option value="yemek">Yemek</option><option value="diger">Diğer</option></select>
       <select id="gMonth" style="max-width:160px;">${monthOptions(mkey(today()))}</select>
-    </div><div class="tblwrap" id="gTable"><div class="empty">Yükleniyor…</div></div>`;
+    </div><div class="tblwrap" id="gTable"><div class="empty">Yükleniyor…</div></div>
+    <div class="panel"><h3>Not</h3><div style="font-size:12px;color:var(--dim);">Veresiye malzeme alımlarını buraya değil, <b>Malzemeciler</b> sayfasına girin — orada borç takibi yapılır. Burası peşin/anlık harcamalar içindir.</div></div>`;
   const projs = await q("projects"); const projOpts = [{ v: "", t: "Proje yok" }].concat(projs.map((p) => ({ v: p.id, t: p.name })));
   const pName = {}; projs.forEach((p) => pName[p.id] = p.name);
   const gFields = [
     { key: "category", label: "Kategori", type: "select", options: [{ v: "malzeme", t: "Malzeme" }, { v: "yakit", t: "Yakıt" }, { v: "yemek", t: "Yemek" }, { v: "diger", t: "Diğer" }] },
     { key: "amount", label: "Tutar (TL)", type: "number", required: true },
     { key: "tx_date", label: "Tarih", type: "date", def: today() },
+    payField,
     { key: "project_id", label: "Proje (kâr/zarar için)", type: "select", options: projOpts },
     { key: "note", label: "Açıklama" },
+    { key: "photo", label: "Fiş fotoğrafı (opsiyonel)", type: "file" },
   ];
   const catNames = { malzeme: "Malzeme", yakit: "Yakıt", yemek: "Yemek", diger: "Diğer" };
   const load = async () => {
@@ -615,18 +915,70 @@ async function renderGiderler() {
     let list = await q("expenses", { gte: { tx_date: start }, lte: { tx_date: end }, order: "tx_date" });
     const cat = $("gCat").value; if (cat) list = list.filter((x) => x.category === cat);
     const total = list.reduce((s, x) => s + +x.amount, 0);
-    $("gTable").innerHTML = list.length ? `<table class="tbl"><tr><th>Tarih</th><th>Kategori</th><th>Açıklama</th><th>Proje</th><th>Ekleyen</th><th>Tutar</th><th></th></tr>` +
-      list.map((x) => `<tr><td>${dstr(x.tx_date)}</td><td><span class="pill">${catNames[x.category]}</span></td><td>${esc(x.note || "")}</td><td>${esc(pName[x.project_id] || "—")}</td><td class="pill">${esc(x.created_by || "")}</td><td class="mono">${fmt(x.amount)}</td><td class="rowact"><button class="btn btn-outline btn-sm" data-edit="${x.id}">✎</button><button class="btn btn-danger btn-sm" data-del="${x.id}">🗑</button></td></tr>`).join("") +
-      `<tr><td colspan="5"><b>Toplam</b></td><td class="mono"><b>${fmt(total)}</b></td><td></td></tr></table>` : '<div class="empty">Bu ayda gider yok</div>';
+    $("gTable").innerHTML = list.length ? `<table class="tbl"><tr><th>Tarih</th><th>Kategori</th><th>Açıklama</th><th>Proje</th><th>Fiş</th><th>Ekleyen</th><th>Tutar</th><th></th></tr>` +
+      list.map((x) => `<tr><td>${dstr(x.tx_date)}</td><td><span class="pill">${catNames[x.category]}</span>${x.payment_method ? ' <span class="pill">' + x.payment_method + "</span>" : ""}</td><td>${esc(x.note || "")}</td><td>${esc(pName[x.project_id] || "—")}</td><td>${x.photo_url ? `<a href="${x.photo_url}" target="_blank" style="color:var(--steel);">📎</a>` : ""}</td><td class="pill">${esc(x.created_by || "")}</td><td class="mono">${fmt(x.amount)}</td><td class="rowact"><button class="btn btn-outline btn-sm" data-edit="${x.id}">✎</button><button class="btn btn-danger btn-sm" data-del="${x.id}">🗑</button></td></tr>`).join("") +
+      `<tr><td colspan="6"><b>Toplam</b></td><td class="mono"><b>${fmt(total)}</b></td><td></td></tr></table>` : '<div class="empty">Bu ayda gider yok</div>';
     const by = {}; list.forEach((x) => by[x.id] = x);
-    $("gTable").querySelectorAll("[data-edit]").forEach((b) => b.onclick = () => openForm("Gideri Düzenle", gFields, by[b.dataset.edit], async (v) => { await upd("expenses", b.dataset.edit, v); toast("Güncellendi"); load(); }));
+    $("gTable").querySelectorAll("[data-edit]").forEach((b) => b.onclick = () => openForm("Gideri Düzenle", gFields, by[b.dataset.edit], async (v) => {
+      const url = v.photo ? await uploadPhoto(v.photo) : null; delete v.photo;
+      if (url) v.photo_url = url;
+      await upd("expenses", b.dataset.edit, v); toast("Güncellendi"); load();
+    }));
     $("gTable").querySelectorAll("[data-del]").forEach((b) => b.onclick = () => del("expenses", b.dataset.del, load));
   };
-  $("gAdd").onclick = () => openForm("Yeni Gider", gFields, { category: "malzeme" }, async (v) => { await ins("expenses", v); toast("Gider eklendi"); load(); });
+  $("gAdd").onclick = () => openForm("Yeni Gider", gFields, { category: "malzeme" }, async (v) => {
+    if (!(await checkDup("expenses", { tx_date: v.tx_date, amount: v.amount, category: v.category }))) return;
+    const url = v.photo ? await uploadPhoto(v.photo) : null; delete v.photo;
+    if (url) v.photo_url = url;
+    await ins("expenses", v); toast("Gider eklendi"); load();
+  });
   $("gCat").onchange = load; $("gMonth").onchange = load;
   load();
 }
 
+/* ---------- PROJELER (kâr/zarar: işçilik + gider + taşeron + malzemeci) ---------- */
+async function renderProjeler() {
+  const el = $("page-projeler");
+  el.innerHTML = `<div class="page-head"><h2>Projeler — Kâr / Zarar</h2><button class="btn btn-amber btn-sm" id="pAdd">+ Yeni Proje</button></div><div id="pList" class="empty">Yükleniyor…</div>`;
+  const pFields = [
+    { key: "name", label: "Proje Adı", required: true },
+    { key: "customer", label: "Müşteri / İşveren" },
+    { key: "contract_amount", label: "Sözleşme Tutarı (TL)", type: "number" },
+    { key: "status", label: "Durum", type: "select", options: [{ v: "aktif", t: "Aktif" }, { v: "tamamlandi", t: "Tamamlandı" }, { v: "beklemede", t: "Beklemede" }] },
+  ];
+  const load = async () => {
+    const [projs, att, exp, cari, subtx, suptx] = await Promise.all([
+      q("projects", { order: "created_at" }), q("attendance"), q("expenses"), q("cari_tx"), q("sub_tx"), q("supplier_tx"),
+    ]);
+    if (!projs.length) { $("pList").innerHTML = '<div class="empty">Henüz proje yok. "+ Yeni Proje" ile başlayın.</div>'; }
+    else {
+      $("pList").innerHTML = projs.map((p) => {
+        const isc = att.filter((a) => a.project_id === p.id).reduce((s, a) => s + +a.wage_amount, 0);
+        const gid = exp.filter((a) => a.project_id === p.id).reduce((s, a) => s + +a.amount, 0);
+        const tas = subtx.filter((a) => a.project_id === p.id && a.direction === "hakedis").reduce((s, a) => s + +a.amount, 0);
+        const mal = suptx.filter((a) => a.project_id === p.id && a.direction === "borc").reduce((s, a) => s + +a.amount, 0);
+        const gel = cari.filter((a) => a.project_id === p.id && a.direction === "hakedis").reduce((s, a) => s + +a.amount, 0);
+        const net = gel - isc - gid - tas - mal;
+        return `<div class="panel" style="margin-top:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">
+            <div><b style="font-size:15px;">${esc(p.name)}</b> <span class="pill">${p.status}</span><br><span style="font-size:12px;color:var(--dim);">${esc(p.customer || "")} ${p.contract_amount ? "· Sözleşme: " + fmt(p.contract_amount) : ""}</span></div>
+            <div class="rowact"><button class="btn btn-outline btn-sm" data-edit="${p.id}">✎</button><button class="btn btn-danger btn-sm" data-del="${p.id}">🗑</button></div>
+          </div>
+          <div class="grid c4" style="margin-top:10px;">
+            <div class="stat"><div class="lbl">Gelir (Hakediş)</div><div class="val v-green">${fmt(gel)}</div></div>
+            <div class="stat"><div class="lbl">İşçilik</div><div class="val v-steel">${fmt(isc)}</div></div>
+            <div class="stat"><div class="lbl">Gider+Taşeron+Malzeme</div><div class="val v-red">${fmt(gid + tas + mal)}</div></div>
+            <div class="stat"><div class="lbl">Net</div><div class="val ${net >= 0 ? "v-green" : "v-red"}">${fmtS(net)}</div></div>
+          </div></div>`;
+      }).join("");
+    }
+    const pBy = {}; projs.forEach((p) => pBy[p.id] = p);
+    $("pList").querySelectorAll("[data-edit]").forEach((b) => b.onclick = () => openForm("Projeyi Düzenle", pFields, pBy[b.dataset.edit], async (v) => { await upd("projects", b.dataset.edit, v); toast("Güncellendi"); load(); }));
+    $("pList").querySelectorAll("[data-del]").forEach((b) => b.onclick = () => del("projects", b.dataset.del, load));
+  };
+  $("pAdd").onclick = () => openForm("Yeni Proje", pFields, { status: "aktif" }, async (v) => { await ins("projects", v); toast("Proje eklendi"); load(); });
+  load();
+}
 /* ---------- TAŞERONLAR ---------- */
 async function renderTaseron() {
   const el = $("page-taseron");
@@ -705,51 +1057,84 @@ async function renderPortfoy() {
 
 /* ---------- RAPORLAR ---------- */
 function dlXlsx(rows, name, sheet) { if (!rows.length) { toast("Veri yok"); return; } const ws = XLSX.utils.json_to_sheet(rows); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, sheet || "Rapor"); XLSX.writeFile(wb, name); }
-function dlPdf(rows, name, title) { if (!rows.length) { toast("Veri yok"); return; } const { jsPDF } = window.jspdf; const doc = new jsPDF(); doc.setFontSize(13); doc.text(title, 14, 15); const cols = Object.keys(rows[0]); doc.autoTable({ head: [cols], body: rows.map((r) => cols.map((c) => typeof r[c] === "number" ? r[c].toLocaleString("tr-TR") : (r[c] ?? ""))), startY: 21, styles: { fontSize: 8 } }); doc.save(name); }
+function dlPdf(rows, name, title) { if (!rows.length) { toast("Veri yok"); return; } const { jsPDF } = window.jspdf; const doc = new jsPDF({ orientation: "landscape" }); doc.setFontSize(13); doc.text(title, 14, 15); const cols = Object.keys(rows[0]); doc.autoTable({ head: [cols], body: rows.map((r) => cols.map((c) => typeof r[c] === "number" ? r[c].toLocaleString("tr-TR") : (r[c] ?? ""))), startY: 21, styles: { fontSize: 8 } }); doc.save(name); }
 
 async function renderRaporlar() {
   const el = $("page-raporlar");
   const mk = mkey(today());
+  const { start: ms, end: mePreset } = monthRange(mk);
   el.innerHTML = `<div class="page-head"><h2>Raporlar</h2></div>
-    <div class="searchrow"><label style="align-self:center;font-size:12.5px;color:var(--dim);">Rapor ayı:</label><select id="rMonth" style="max-width:170px;">${monthOptions(mk)}</select></div>
-    <div class="grid c2">
-      <div class="panel"><h3>İşçi Hakediş (Seçili Ay)</h3><div style="font-size:12px;color:var(--dim);margin-bottom:10px;">Gün × yevmiye − avans − ödenen = net kalan</div><button class="btn btn-amber btn-sm" id="rHx">📊 Excel</button> <button class="btn btn-outline btn-sm" id="rHp">📄 PDF</button></div>
-      <div class="panel"><h3>Proje Kâr / Zarar</h3><div style="font-size:12px;color:var(--dim);margin-bottom:10px;">Tüm projeler, tüm zamanlar</div><button class="btn btn-amber btn-sm" id="rPx">📊 Excel</button> <button class="btn btn-outline btn-sm" id="rPp">📄 PDF</button></div>
-      <div class="panel"><h3>Cari Hesap Dökümü</h3><div style="font-size:12px;color:var(--dim);margin-bottom:10px;">Tüm müşteri hareketleri</div><button class="btn btn-amber btn-sm" id="rCx">📊 Excel</button> <button class="btn btn-outline btn-sm" id="rCp">📄 PDF</button></div>
-      <div class="panel"><h3>Gider Dökümü (Seçili Ay)</h3><div style="font-size:12px;color:var(--dim);margin-bottom:10px;">Kategori + proje + ekleyen</div><button class="btn btn-amber btn-sm" id="rGx">📊 Excel</button> <button class="btn btn-outline btn-sm" id="rGp">📄 PDF</button></div>
+    <div class="searchrow">
+      <label style="align-self:center;font-size:12.5px;color:var(--dim);">Ay (hakediş için):</label><select id="rMonth" style="max-width:170px;">${monthOptions(mk)}</select>
     </div>
-    <div class="panel"><h3>Yedekleme Önerisi</h3><div style="font-size:12.5px;color:var(--dim);line-height:1.6;">Ücretsiz planda otomatik yedek yoktur. Ay sonunda bu dört raporu Excel olarak indirip saklamanız önerilir.</div></div>`;
+    <div class="searchrow">
+      <label style="align-self:center;font-size:12.5px;color:var(--dim);">Tarih aralığı (cari/gider için):</label>
+      <input type="date" id="rStart" value="${ms}" style="max-width:160px;">
+      <input type="date" id="rEnd" value="${mePreset}" style="max-width:160px;">
+    </div>
+    <div class="grid c2">
+      <div class="panel"><h3>İşçi Hakediş (Seçili Ay)</h3><div style="font-size:12px;color:var(--dim);margin-bottom:10px;">Gün (yarımlar dahil) × yevmiye − avans − ödenen = net kalan</div><button class="btn btn-amber btn-sm" id="rHx">📊 Excel</button> <button class="btn btn-outline btn-sm" id="rHp">📄 PDF</button></div>
+      <div class="panel"><h3>Proje Kâr / Zarar</h3><div style="font-size:12px;color:var(--dim);margin-bottom:10px;">İşçilik + gider + taşeron + malzemeci dahil</div><button class="btn btn-amber btn-sm" id="rPx">📊 Excel</button> <button class="btn btn-outline btn-sm" id="rPp">📄 PDF</button></div>
+      <div class="panel"><h3>Cari Hesap Dökümü (Tarih Aralığı)</h3><div style="font-size:12px;color:var(--dim);margin-bottom:10px;">Müşteri hareketleri</div><button class="btn btn-amber btn-sm" id="rCx">📊 Excel</button> <button class="btn btn-outline btn-sm" id="rCp">📄 PDF</button></div>
+      <div class="panel"><h3>Gider Dökümü (Tarih Aralığı)</h3><div style="font-size:12px;color:var(--dim);margin-bottom:10px;">Kategori + proje + yöntem + ekleyen</div><button class="btn btn-amber btn-sm" id="rGx">📊 Excel</button> <button class="btn btn-outline btn-sm" id="rGp">📄 PDF</button></div>
+      <div class="panel"><h3>Malzemeci Dökümü (Tarih Aralığı)</h3><div style="font-size:12px;color:var(--dim);margin-bottom:10px;">Alım / ödeme / kalan borç</div><button class="btn btn-amber btn-sm" id="rSx">📊 Excel</button> <button class="btn btn-outline btn-sm" id="rSp">📄 PDF</button></div>
+      <div class="panel"><h3>🗄️ TAM YEDEK — Tüm Veriler</h3><div style="font-size:12px;color:var(--dim);margin-bottom:10px;">Bütün tablolar tek Excel dosyasında, her tablo ayrı sayfa. Ay sonu arşivi için.</div><button class="btn btn-green btn-sm" id="rFull">📦 Tam Yedek İndir</button></div>
+    </div>`;
+
   async function hakedis(mk) {
     const { start, end } = monthRange(mk);
     const [workers, att, adv, pay] = await Promise.all([q("workers"), q("attendance", { gte: { work_date: start }, lte: { work_date: end } }), q("advances", { gte: { tx_date: start }, lte: { tx_date: end } }), q("payments", { gte: { tx_date: start }, lte: { tx_date: end } })]);
     return workers.map((w) => {
       const g = att.filter((a) => a.worker_id === w.id);
+      const gun = g.reduce((s, a) => s + +(a.fraction || 1), 0);
       const brut = w.wage_type === "maasli" ? +w.monthly_salary : g.reduce((s, a) => s + +a.wage_amount, 0);
       const a = adv.filter((x) => x.worker_id === w.id).reduce((s, x) => s + +x.amount, 0);
       const p = pay.filter((x) => x.worker_id === w.id).reduce((s, x) => s + +x.amount, 0);
-      return { Isci: w.name, Tip: w.wage_type, Gun: w.wage_type === "maasli" ? "" : g.length, Yevmiye: +w.daily_wage, Brut: brut, Avans: a, Odenen: p, NetKalan: brut - a - p };
+      return { Isci: w.name, Tip: w.wage_type, Gun: w.wage_type === "maasli" ? "" : gun, Yevmiye: +w.daily_wage, Brut: brut, Avans: a, Odenen: p, NetKalan: brut - a - p };
     });
   }
   async function projeKZ() {
-    const [projs, att, exp, cari, subtx] = await Promise.all([q("projects"), q("attendance"), q("expenses"), q("cari_tx"), q("sub_tx")]);
+    const [projs, att, exp, cari, subtx, suptx] = await Promise.all([q("projects"), q("attendance"), q("expenses"), q("cari_tx"), q("sub_tx"), q("supplier_tx")]);
     return projs.map((p) => {
       const isc = att.filter((a) => a.project_id === p.id).reduce((s, a) => s + +a.wage_amount, 0);
       const gid = exp.filter((a) => a.project_id === p.id).reduce((s, a) => s + +a.amount, 0);
       const tas = subtx.filter((a) => a.project_id === p.id && a.direction === "hakedis").reduce((s, a) => s + +a.amount, 0);
+      const mal = suptx.filter((a) => a.project_id === p.id && a.direction === "borc").reduce((s, a) => s + +a.amount, 0);
       const gel = cari.filter((a) => a.project_id === p.id && a.direction === "hakedis").reduce((s, a) => s + +a.amount, 0);
-      return { Proje: p.name, Musteri: p.customer || "", Sozlesme: +p.contract_amount, Gelir: gel, Iscilik: isc, Gider: gid, Taseron: tas, Net: gel - isc - gid - tas };
+      return { Proje: p.name, Musteri: p.customer || "", Sozlesme: +p.contract_amount, Gelir: gel, Iscilik: isc, Gider: gid, Taseron: tas, Malzemeci: mal, Net: gel - isc - gid - tas - mal };
     });
   }
+  const range = () => ({ start: $("rStart").value, end: $("rEnd").value });
   async function cariDokum() {
-    const [custs, txs] = await Promise.all([q("customers"), q("cari_tx", { order: "tx_date" })]);
+    const { start, end } = range();
+    const [custs, txs] = await Promise.all([q("customers"), q("cari_tx", { gte: { tx_date: start }, lte: { tx_date: end }, order: "tx_date" })]);
     const cn = {}; custs.forEach((c) => cn[c.id] = c.name);
-    return txs.map((t) => ({ Musteri: cn[t.customer_id] || "", Tarih: dstr(t.tx_date), Tur: t.direction, Tutar: +t.amount, Aciklama: t.note || "", Ekleyen: t.created_by || "" }));
+    return txs.map((t) => ({ Musteri: cn[t.customer_id] || "", Tarih: dstr(t.tx_date), Tur: t.direction, Tutar: +t.amount, Yontem: t.payment_method || "", Aciklama: t.note || "", Ekleyen: t.created_by || "" }));
   }
-  async function giderDokum(mk) {
-    const { start, end } = monthRange(mk);
+  async function giderDokum() {
+    const { start, end } = range();
     const [list, projs] = await Promise.all([q("expenses", { gte: { tx_date: start }, lte: { tx_date: end }, order: "tx_date" }), q("projects")]);
     const pn = {}; projs.forEach((p) => pn[p.id] = p.name);
-    return list.map((x) => ({ Tarih: dstr(x.tx_date), Kategori: x.category, Tutar: +x.amount, Proje: pn[x.project_id] || "", Aciklama: x.note || "", Ekleyen: x.created_by || "" }));
+    return list.map((x) => ({ Tarih: dstr(x.tx_date), Kategori: x.category, Tutar: +x.amount, Yontem: x.payment_method || "", Proje: pn[x.project_id] || "", Aciklama: x.note || "", Ekleyen: x.created_by || "", Fis: x.photo_url ? "var" : "" }));
+  }
+  async function malzemeciDokum() {
+    const { start, end } = range();
+    const [sups, txs, projs] = await Promise.all([q("suppliers"), q("supplier_tx", { gte: { tx_date: start }, lte: { tx_date: end }, order: "tx_date" }), q("projects")]);
+    const sn = {}; sups.forEach((s) => sn[s.id] = s.name);
+    const pn = {}; projs.forEach((p) => pn[p.id] = p.name);
+    return txs.map((t) => ({ Malzemeci: sn[t.supplier_id] || "", Tarih: dstr(t.tx_date), Tur: t.direction === "borc" ? "alim" : "odeme", Tutar: +t.amount, FiyatBekliyor: t.price_pending ? "EVET" : "", Proje: pn[t.project_id] || "", Aciklama: t.note || "", Ekleyen: t.created_by || "" }));
+  }
+  async function fullBackup() {
+    toast("Yedek hazırlanıyor…");
+    const tables = ["projects","workers","attendance","advances","payments","expenses","customers","cari_tx","suppliers","supplier_tx","subcontractors","sub_tx","properties","contracts","telegram_log"];
+    const wb = XLSX.utils.book_new();
+    for (const t of tables) {
+      const rows = await q(t);
+      const ws = XLSX.utils.json_to_sheet(rows.length ? rows : [{}]);
+      XLSX.utils.book_append_sheet(wb, ws, t.slice(0, 31));
+    }
+    XLSX.writeFile(wb, "tam-yedek-" + today() + ".xlsx");
+    toast("Yedek indirildi");
   }
   const m = () => $("rMonth").value;
   $("rHx").onclick = async () => dlXlsx(await hakedis(m()), `hakedis-${m()}.xlsx`, "Hakediş");
@@ -758,15 +1143,31 @@ async function renderRaporlar() {
   $("rPp").onclick = async () => dlPdf(await projeKZ(), "proje-kar-zarar.pdf", "Proje Kâr/Zarar");
   $("rCx").onclick = async () => dlXlsx(await cariDokum(), "cari-dokum.xlsx", "Cari");
   $("rCp").onclick = async () => dlPdf(await cariDokum(), "cari-dokum.pdf", "Cari Hesap Dökümü");
-  $("rGx").onclick = async () => dlXlsx(await giderDokum(m()), `giderler-${m()}.xlsx`, "Giderler");
-  $("rGp").onclick = async () => dlPdf(await giderDokum(m()), `giderler-${m()}.pdf`, "Gider Dökümü — " + mlabel(m()));
+  $("rGx").onclick = async () => dlXlsx(await giderDokum(), "giderler.xlsx", "Giderler");
+  $("rGp").onclick = async () => dlPdf(await giderDokum(), "giderler.pdf", "Gider Dökümü");
+  $("rSx").onclick = async () => dlXlsx(await malzemeciDokum(), "malzemeci-dokum.xlsx", "Malzemeciler");
+  $("rSp").onclick = async () => dlPdf(await malzemeciDokum(), "malzemeci-dokum.pdf", "Malzemeci Dökümü");
+  $("rFull").onclick = fullBackup;
 }
 
 /* ---------- AYARLAR ---------- */
 async function renderAyarlar() {
   const el = $("page-ayarlar");
   const users = await q("profiles", { select: "full_name, role, created_at" });
+  const isLight = document.body.classList.contains("light");
+  const isBig = document.body.classList.contains("bigfont");
   el.innerHTML = `<div class="page-head"><h2>Ayarlar</h2></div>
+    <div class="panel"><h3>Görünüm</h3>
+      <div class="searchrow">
+        <select id="setTheme" style="max-width:200px;">
+          <option value="dark" ${!isLight ? "selected" : ""}>Koyu tema</option>
+          <option value="light" ${isLight ? "selected" : ""}>Açık tema (güneşte okunur)</option>
+        </select>
+        <select id="setFont" style="max-width:200px;">
+          <option value="normal" ${!isBig ? "selected" : ""}>Normal yazı</option>
+          <option value="big" ${isBig ? "selected" : ""}>Büyük yazı</option>
+        </select>
+      </div></div>
     <div class="panel"><h3>Şirket Bilgileri</h3>
       <div style="line-height:1.9;font-size:13.5px;">
         Şirket: <b>${esc(myCompany.name)}</b><br>
@@ -775,8 +1176,16 @@ async function renderAyarlar() {
       </div></div>
     <div class="panel"><h3>Kullanıcılar</h3><table class="tbl"><tr><th>Ad</th><th>Rol</th><th>Katılım</th></tr>
       ${users.map((u) => `<tr><td>${esc(u.full_name)}</td><td><span class="pill">${u.role}</span></td><td>${dstr(u.created_at)}</td></tr>`).join("")}</table>
-      <div style="font-size:12px;color:var(--dim);margin-top:8px;">Silme işlemleri yalnızca yönetici rolüyle yapılabilir. Roller şimdilik veritabanından (Supabase > profiles tablosu) değiştirilir.</div></div>
+      <div style="font-size:12px;color:var(--dim);margin-top:8px;">Silme işlemleri yalnızca yönetici rolüyle yapılabilir (puantaj düzeltmeleri hariç). Rol değişikliği: Supabase > Table Editor > profiles.</div></div>
     <div class="panel"><h3>Oturum</h3><button class="btn btn-danger" id="logoutBtn">Çıkış Yap</button></div>`;
+  $("setTheme").onchange = (e) => {
+    document.body.classList.toggle("light", e.target.value === "light");
+    try { localStorage.setItem("theme", e.target.value === "light" ? "light" : "dark"); } catch (err) {}
+  };
+  $("setFont").onchange = (e) => {
+    document.body.classList.toggle("bigfont", e.target.value === "big");
+    try { localStorage.setItem("bigfont", e.target.value === "big" ? "1" : "0"); } catch (err) {}
+  };
   $("logoutBtn").onclick = async () => { await sb.auth.signOut(); location.reload(); };
 }
 
