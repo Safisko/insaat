@@ -246,7 +246,8 @@ const $ = (id) => document.getElementById(id);
 const fmt = (n) => "₺" + Math.abs(Number(n) || 0).toLocaleString("tr-TR", { maximumFractionDigits: 0 });
 const fmtS = (n) => (Number(n) < 0 ? "−" : "") + fmt(n);
 const dstr = (d) => new Date(d).toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit", year: "2-digit" });
-const today = () => new Date().toISOString().slice(0, 10);
+function localKey(d) { const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, "0"), day = String(d.getDate()).padStart(2, "0"); return `${y}-${m}-${day}`; }
+const today = () => localKey(new Date());
 const mkey = (d) => String(d).slice(0, 7);
 const esc = (s) => (s == null ? "" : String(s)).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 function toast(m) { const t = $("toast"); t.textContent = m; t.classList.add("show"); clearTimeout(toast._h); toast._h = setTimeout(() => t.classList.remove("show"), 2600); }
@@ -254,8 +255,8 @@ const isAdmin = () => me?.role === "yonetici";
 const MONTHS = ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
 const mlabel = (mk) => { const [y, m] = mk.split("-"); return MONTHS[+m - 1] + " " + y; };
 const mshort = (mk) => { const [y, m] = mk.split("-"); return MONTHS[+m - 1].slice(0,3) + " " + y.slice(2); };
-function monthOptions(sel) { const out = []; const now = new Date(); for (let i = 0; i < 12; i++) { const d = new Date(now.getFullYear(), now.getMonth() - i, 1); const k = d.toISOString().slice(0, 7); out.push(`<option value="${k}" ${k === sel ? "selected" : ""}>${mlabel(k)}</option>`); } return out.join(""); }
-function monthRange(mk) { const [y, m] = mk.split("-").map(Number); const start = `${mk}-01`; const end = new Date(y, m, 0).toISOString().slice(0, 10); return { start, end }; }
+function monthOptions(sel) { const out = []; const now = new Date(); for (let i = 0; i < 12; i++) { const d = new Date(now.getFullYear(), now.getMonth() - i, 1); const k = localKey(d).slice(0, 7); out.push(`<option value="${k}" ${k === sel ? "selected" : ""}>${mlabel(k)}</option>`); } return out.join(""); }
+function monthRange(mk) { const [y, m] = mk.split("-").map(Number); const start = `${mk}-01`; const end = localKey(new Date(y, m, 0)); return { start, end }; }
 const PAY_OPTS = [{ v: "", t: "— yöntem —" }, { v: "nakit", t: "Nakit" }, { v: "banka", t: "Banka" }, { v: "kart", t: "Kart" }];
 const payField = { key: "payment_method", label: "Ödeme Yöntemi", type: "select", options: PAY_OPTS };
 const frLabel = (f) => { f = +f; return f === 1 ? "tam" : (f === 0.5 ? "yarım" : (f === 1.5 ? "1,5" : String(f).replace(".", ","))); };
@@ -523,7 +524,7 @@ async function renderPanel() {
   // 6 aylık eğilim
   const now = new Date(); const trend = [];
   for (let i = 5; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth()-i, 1); const k = d.toISOString().slice(0,7);
+    const d = new Date(now.getFullYear(), now.getMonth()-i, 1); const k = localKey(d).slice(0,7);
     trend.push({ mk: k,
       gider: exp.filter(x=>mkey(x.tx_date)===k).reduce((s,a)=>s + +a.amount,0),
       iscilik: att.filter(a=>mkey(a.work_date)===k).reduce((s,a)=>s + +a.wage_amount,0),
@@ -537,7 +538,7 @@ async function renderPanel() {
   const cMax = Math.max(1, ...Object.values(byCat), 0);
 
   // dün puantajı girilmeyenler
-  const dun = new Date(Date.now()-864e5).toISOString().slice(0,10);
+  const dun = localKey(new Date(Date.now()-864e5));
   const dunlu = new Set(att.filter(a=>a.work_date===dun).map(a=>a.worker_id));
   const eksik = workers.filter(w=>w.active && w.wage_type!=="maasli" && !dunlu.has(w.id)).map(w=>w.name);
 
@@ -601,6 +602,22 @@ async function renderPuantaj() {
     } catch (e) { toast("Eklenemedi: " + (e.message || e)); return false; }
   }
 
+  async function editAtt(a, w, cb) {
+    const projOpts = projs.map((p) => ({ v: p.id, t: p.name }));
+    openForm("Puantaj Kaydını Düzenle", [
+      { key: "project_id", label: "Proje", type: "select", options: projOpts, required: true },
+      { key: "fraction", label: "Gün Kesri", type: "select", options: FR_OPTS, required: true },
+    ], { project_id: a.project_id, fraction: String(a.fraction || 1) }, async (v) => {
+      const fraction = parseFloat(v.fraction);
+      const others = (await q("attendance", { eq: { worker_id: w.id, work_date: a.work_date } })).filter((x) => x.id !== a.id);
+      const sum = others.reduce((s, x) => s + +(x.fraction || 1), 0);
+      if (sum + fraction > 1.5) { toast("Bu günün toplamı 1,5 günü aşamaz (diğer kayıtlar: " + frLabel(sum) + ")"); return; }
+      if (others.some((x) => x.project_id === v.project_id)) { toast("Bu projeye bu gün için zaten başka bir kayıt var"); return; }
+      await upd("attendance", a.id, { project_id: v.project_id, fraction, wage_amount: Math.round(w.daily_wage * fraction * 100) / 100 });
+      toast("Güncellendi"); cb();
+    });
+  }
+
   async function loadDay() {
     const d = $("puDate").value;
     const att = await q("attendance", { eq: { work_date: d } });
@@ -608,12 +625,17 @@ async function renderPuantaj() {
     $("puList").innerHTML = workers.map((w) => {
       const mine = att.filter((a) => a.worker_id === w.id);
       const sum = mine.reduce((s, a) => s + +(a.fraction || 1), 0);
-      const rows = mine.map((a) => `<div class="p-sub" style="display:flex;justify-content:space-between;align-items:center;">✓ ${esc(pName[a.project_id] || "?")} · ${frLabel(a.fraction || 1)} gün <span class="btn btn-danger btn-sm" data-da="${a.id}">🗑</span></div>`).join("");
+      const rows = mine.map((a) => `<div class="p-sub" style="display:flex;justify-content:space-between;align-items:center;">✓ ${esc(pName[a.project_id] || "?")} · ${frLabel(a.fraction || 1)} gün <span><button class="btn btn-outline btn-sm" data-ea="${a.id}">✎</button> <button class="btn btn-danger btn-sm" data-da="${a.id}">🗑</button></span></div>`).join("");
       const addRow = sum < 1.5 ? `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:7px;">${projSel(w.id, w.project_id)}${frSel(w.id)}<button class="btn btn-green btn-sm" data-mk="${w.id}">Ekle</button></div>` : "";
       return `<div class="item-card" style="flex-direction:column;align-items:stretch;">
         <div style="display:flex;justify-content:space-between;"><b>${esc(w.name)}</b><span class="p-sub">${fmt(w.daily_wage)}${sum ? " · bugün " + frLabel(sum) + " gün" : ""}</span></div>
         ${rows}${addRow}</div>`;
     }).join("");
+    const attById = {}; att.forEach((a) => attById[a.id] = a);
+    $("puList").querySelectorAll("[data-ea]").forEach((b) => b.onclick = () => {
+      const a = attById[b.dataset.ea]; const w = workers.find((x) => x.id === a.worker_id);
+      editAtt(a, w, loadDay);
+    });
     $("puList").querySelectorAll("[data-da]").forEach((b) => b.onclick = () => delAtt(b.dataset.da, loadDay));
     $("puList").querySelectorAll("[data-mk]").forEach((b) => b.onclick = async () => {
       const w = workers.find((x) => x.id === b.dataset.mk);
@@ -650,11 +672,15 @@ async function renderPuantaj() {
     const sum = list.reduce((s, a) => s + +(a.fraction || 1), 0);
     const box = $("modalBox");
     box.innerHTML = `<h3>${esc(w.name)} — ${day} ${mlabel(mk)}</h3>
-      ${list.map((a) => `<div class="tx-item"><div>${esc(pName[a.project_id] || "?")} · ${frLabel(a.fraction || 1)} gün</div><div class="tx-del" data-x="${a.id}">✕</div></div>`).join("") || '<div class="empty">Kayıt yok (izinli / boş gün)</div>'}
+      ${list.map((a) => `<div class="tx-item"><div>${esc(pName[a.project_id] || "?")} · ${frLabel(a.fraction || 1)} gün</div><div style="display:flex;gap:6px;"><span class="tx-edit" data-ex="${a.id}" style="cursor:pointer;">✎</span><span class="tx-del" data-x="${a.id}">✕</span></div></div>`).join("") || '<div class="empty">Kayıt yok (izinli / boş gün)</div>'}
       ${sum < 1.5 ? `<div style="display:flex;gap:6px;margin-top:12px;flex-wrap:wrap;">${projSel("cal", w.project_id)}${frSel("cal")}<button class="btn btn-green btn-sm" id="calAdd">Ekle</button></div>` : ""}
       <div class="actions"><button class="btn btn-outline" id="calClose">Kapat</button></div>`;
     $("modalOverlay").classList.add("open");
     $("calClose").onclick = closeModal;
+    box.querySelectorAll("[data-ex]").forEach((b) => b.onclick = () => {
+      const a = list.find((x) => x.id === b.dataset.ex);
+      editAtt(a, w, () => { dayModal(wid, mk, day); loadCal(); });
+    });
     box.querySelectorAll("[data-x]").forEach((b) => b.onclick = async () => {
       if (!(await confirmDel("Bu puantaj kaydı silinsin mi?"))) return;
       await sb.from("attendance").delete().eq("id", b.dataset.x);
