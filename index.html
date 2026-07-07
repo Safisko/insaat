@@ -227,7 +227,7 @@ table.tbl tr:last-child td{border-bottom:none;}
    URL hazır girildi; sadece Publishable key'inizi yazın.
    ===================================================== */
 const SUPABASE_URL = "https://yvbbojujrouiscasgfpl.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_ecNHncTWwCmL8AhGp16V4w_XA6lWPOT";   // sb_publishable_... ile başlayan anahtar
+const SUPABASE_ANON_KEY = "BURAYA_PUBLISHABLE_KEY";   // sb_publishable_... ile başlayan anahtar
 /* ===================================================== */
 
 const CFG_OK = SUPABASE_URL.startsWith("https://") && SUPABASE_ANON_KEY.length > 30;
@@ -480,6 +480,24 @@ function barRow(label, val, max, color) {
   return `<div class="bar-row"><span class="bl">${esc(label)}</span><div class="bwrap"><div class="bfill" style="width:${w}%;background:${color};"></div></div><span class="bv">${fmt(val)}</span></div>`;
 }
 
+/* ---------- işçi net/brüt hesaplama (ortak) ---------- */
+// mode "month": maaşlı işçide brüt = monthly_salary (ay bazlı ekranlar)
+// mode "all"  : maaşlı işçide tüm-zamanlar brüt bilinmiyor -> brut=null, net = -(avans+ödeme)
+function workerNet(w, attRows, advRows, payRows, mode = "month") {
+  const mine = attRows.filter(a => a.worker_id === w.id);
+  const gun = mine.reduce((s, a) => s + +(a.fraction || 1), 0);
+  const a = advRows.filter(x => x.worker_id === w.id).reduce((s, x) => s + +x.amount, 0);
+  const p = payRows.filter(x => x.worker_id === w.id).reduce((s, x) => s + +x.amount, 0);
+  let brut;
+  if (w.wage_type === "maasli") {
+    brut = mode === "all" ? null : +w.monthly_salary;
+  } else {
+    brut = mine.reduce((s, x) => s + +x.wage_amount, 0);
+  }
+  const net = (brut == null ? 0 : brut) - a - p;
+  return { brut, gun, avans: a, odeme: p, net };
+}
+
 /* ---------- PANEL ---------- */
 async function renderPanel() {
   const el = $("page-panel");
@@ -491,7 +509,7 @@ async function renderPanel() {
   const inMonth = (d) => mkey(d) === mk;
 
   // genel bakiyeler (tüm zamanlar)
-  const isciBorc = att.reduce((s,a)=>s + +a.wage_amount,0) - adv.reduce((s,a)=>s + +a.amount,0) - pay.reduce((s,a)=>s + +a.amount,0);
+  const isciBorc = workers.reduce((s,w) => s + workerNet(w, att, adv, pay, "all").net, 0);
   const musteriAlacak = cari.filter(c=>c.direction==="hakedis").reduce((s,a)=>s + +a.amount,0) - cari.filter(c=>c.direction==="tahsilat").reduce((s,a)=>s + +a.amount,0);
   const malzemeciBorc = sup.filter(x=>x.direction==="borc").reduce((s,a)=>s + +a.amount,0) - sup.filter(x=>x.direction==="odeme").reduce((s,a)=>s + +a.amount,0);
   const bekleyenFis = sup.filter(x=>x.price_pending).length;
@@ -507,10 +525,11 @@ async function renderPanel() {
   for (let i = 5; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth()-i, 1); const k = d.toISOString().slice(0,7);
     trend.push({ mk: k,
-      gider: exp.filter(x=>mkey(x.tx_date)===k).reduce((s,a)=>s + +a.amount,0) + att.filter(a=>mkey(a.work_date)===k).reduce((s,a)=>s + +a.wage_amount,0),
+      gider: exp.filter(x=>mkey(x.tx_date)===k).reduce((s,a)=>s + +a.amount,0),
+      iscilik: att.filter(a=>mkey(a.work_date)===k).reduce((s,a)=>s + +a.wage_amount,0),
       tahsilat: cari.filter(c=>c.direction==="tahsilat"&&mkey(c.tx_date)===k).reduce((s,a)=>s + +a.amount,0) });
   }
-  const tMax = Math.max(1, ...trend.map(t=>Math.max(t.gider,t.tahsilat)));
+  const tMax = Math.max(1, ...trend.map(t=>Math.max(t.gider, t.iscilik, t.tahsilat)));
 
   // kategori dağılımı (bu ay)
   const byCat = {}; exp.filter(x=>inMonth(x.tx_date)).forEach(e=>byCat[e.category]=(byCat[e.category]||0)+ +e.amount);
@@ -532,9 +551,9 @@ async function renderPanel() {
     </div>
     ${eksik.length ? `<div class="panel" style="border-color:var(--amber);"><h3>⚠️ Dün (${dstr(dun)}) puantajı girilmeyenler</h3><div style="font-size:13px;">${eksik.map(esc).join(", ")} — <a href="#" onclick="nav('puantaj');return false;" style="color:var(--amber);">Puantaja git</a></div></div>` : ""}
     ${bekleyenFis ? `<div class="panel"><h3>🧾 Fiyat bekleyen teslim fişi: ${bekleyenFis} adet</h3><div style="font-size:12.5px;color:var(--dim);">Malzemeciler sayfasından tutarlarını girebilirsiniz.</div></div>` : ""}
-    <div class="panel"><h3>Son 6 Ay — Gider+İşçilik vs Tahsilat</h3>
-      <div class="legend"><span><span class="dot" style="background:var(--danger);"></span>Gider+İşçilik</span><span><span class="dot" style="background:var(--green);"></span>Tahsilat</span></div>
-      ${trend.map(t=>barRow(mshort(t.mk), t.gider, tMax, "var(--danger)") + barRow("", t.tahsilat, tMax, "var(--green)")).join("")}
+    <div class="panel"><h3>Son 6 Ay — Gider / İşçilik / Tahsilat</h3>
+      <div class="legend"><span><span class="dot" style="background:var(--danger);"></span>Gider</span><span><span class="dot" style="background:var(--steel);"></span>İşçilik</span><span><span class="dot" style="background:var(--green);"></span>Tahsilat</span></div>
+      ${trend.map(t=>barRow(mshort(t.mk), t.gider, tMax, "var(--danger)") + barRow("", t.iscilik, tMax, "var(--steel)") + barRow("", t.tahsilat, tMax, "var(--green)")).join("")}
     </div>
     <div class="panel"><h3>Bu Ay Gider Dağılımı (işçilik hariç: ${fmt(ayGider)} · işçilik: ${fmt(ayIscilik)})</h3>
       ${Object.keys(byCat).length ? Object.entries(byCat).map(([k,v])=>barRow(catNames[k]||k, v, cMax, "var(--steel)")).join("") : '<div class="empty">Bu ay gider yok</div>'}
@@ -666,7 +685,7 @@ async function renderPuantaj() {
 async function renderIsciler() {
   const el = $("page-isciler");
   el.innerHTML = `<div class="page-head"><h2>İşçiler</h2><button class="btn btn-amber btn-sm" id="wAdd">+ Yeni İşçi</button></div>
-    <div class="searchrow"><input id="wSearch" placeholder="İsim ara…"><select id="wMonth" style="max-width:160px;">${monthOptions(mkey(today()))}</select></div>
+    <div class="searchrow"><input id="wSearch" placeholder="İsim ara…"><select id="wMonth" style="max-width:170px;"><option value="ALL">Tüm Zamanlar</option>${monthOptions(mkey(today()))}</select></div>
     <div class="tblwrap" id="wTable"><div class="empty">Yükleniyor…</div></div>`;
   const projs = await q("projects", { order: "name", asc: true });
   const projOpts = [{ v: "", t: "Proje yok" }].concat(projs.map((p) => ({ v: p.id, t: p.name })));
@@ -680,26 +699,23 @@ async function renderIsciler() {
     { key: "active", label: "Durum", type: "select", options: [{ v: "true", t: "Aktif" }, { v: "false", t: "Ayrıldı" }] },
   ];
   const load = async () => {
-    const mk = $("wMonth").value; const { start, end } = monthRange(mk);
+    const mkSel = $("wMonth").value;
+    const allMode = mkSel === "ALL";
+    const range = allMode ? null : monthRange(mkSel);
     const [workers, att, adv, pay] = await Promise.all([
       q("workers", { order: "name", asc: true }),
-      q("attendance", { gte: { work_date: start }, lte: { work_date: end } }),
-      q("advances", { gte: { tx_date: start }, lte: { tx_date: end } }),
-      q("payments", { gte: { tx_date: start }, lte: { tx_date: end } }),
+      q("attendance", allMode ? {} : { gte: { work_date: range.start }, lte: { work_date: range.end } }),
+      q("advances", allMode ? {} : { gte: { tx_date: range.start }, lte: { tx_date: range.end } }),
+      q("payments", allMode ? {} : { gte: { tx_date: range.start }, lte: { tx_date: range.end } }),
     ]);
     const s = ($("wSearch").value || "").toLowerCase();
     const rows = workers.filter((w) => w.name.toLowerCase().includes(s)).map((w) => {
-      const days = att.filter((a) => a.worker_id === w.id);
-      const gun = days.reduce((x, a) => x + +(a.fraction || 1), 0);
-      const brut = w.wage_type === "maasli" ? +w.monthly_salary : days.reduce((x, a) => x + +a.wage_amount, 0);
-      const a = adv.filter((x) => x.worker_id === w.id).reduce((x, y) => x + +y.amount, 0);
-      const p = pay.filter((x) => x.worker_id === w.id).reduce((x, y) => x + +y.amount, 0);
-      const net = brut - a - p;
+      const { brut, gun, avans: a, odeme: p, net } = workerNet(w, att, adv, pay, allMode ? "all" : "month");
       return `<tr>
         <td><b>${esc(w.name)}</b>${w.active ? "" : ' <span class="pill">ayrıldı</span>'}<br><span class="pill">${esc(pName[w.project_id] || "proje yok")}</span></td>
         <td class="mono">${w.wage_type === "maasli" ? fmt(w.monthly_salary) + "/ay" : fmt(w.daily_wage)}</td>
         <td class="mono">${w.wage_type === "maasli" ? "—" : String(gun).replace(".", ",") + " gün"}</td>
-        <td class="mono">${fmt(brut)}</td>
+        <td class="mono">${brut == null ? "—" : fmt(brut)}</td>
         <td class="mono v-steel">${fmt(a)}</td>
         <td class="mono v-green">${fmt(p)}</td>
         <td class="mono ${net > 0 ? "v-amber" : ""}"><b>${fmtS(net)}</b></td>
@@ -719,8 +735,7 @@ async function renderIsciler() {
       const [allAtt, allAdv, allPay] = await Promise.all([
         q("attendance", { eq: { worker_id: w.id } }), q("advances", { eq: { worker_id: w.id } }), q("payments", { eq: { worker_id: w.id } }),
       ]);
-      const brut = w.wage_type === "maasli" ? 0 : allAtt.reduce((x, a) => x + +a.wage_amount, 0);
-      const net = brut - allAdv.reduce((x, a) => x + +a.amount, 0) - allPay.reduce((x, a) => x + +a.amount, 0);
+      const { net } = workerNet(w, allAtt, allAdv, allPay, "all");
       if (net > 0 && window.confirm(`${w.name} ayrılıyor. Tüm zamanlar net alacağı: ${fmt(net)}.\n\nKapanış ödemesi olarak bu tutar şimdi işlensin mi?`)) {
         await ins("payments", { worker_id: w.id, amount: net, tx_date: today(), note: "Kapanış ödemesi (işten ayrılış)" });
         toast("Kapanış ödemesi işlendi");
@@ -953,6 +968,7 @@ async function renderProjeler() {
     if (!projs.length) { $("pList").innerHTML = '<div class="empty">Henüz proje yok. "+ Yeni Proje" ile başlayın.</div>'; }
     else {
       $("pList").innerHTML = projs.map((p) => {
+        // NOT: maaşlı işçilerin aylık maaşı burada sayılmıyor (attendance.wage_amount maaşlı işçide genelde 0/boş) — bilinçli olarak ertelendi, bkz. CLAUDE.md "Bilinen açık konular".
         const isc = att.filter((a) => a.project_id === p.id).reduce((s, a) => s + +a.wage_amount, 0);
         const gid = exp.filter((a) => a.project_id === p.id).reduce((s, a) => s + +a.amount, 0);
         const tas = subtx.filter((a) => a.project_id === p.id && a.direction === "hakedis").reduce((s, a) => s + +a.amount, 0);
@@ -1058,6 +1074,26 @@ async function renderPortfoy() {
 /* ---------- RAPORLAR ---------- */
 function dlXlsx(rows, name, sheet) { if (!rows.length) { toast("Veri yok"); return; } const ws = XLSX.utils.json_to_sheet(rows); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, sheet || "Rapor"); XLSX.writeFile(wb, name); }
 function dlPdf(rows, name, title) { if (!rows.length) { toast("Veri yok"); return; } const { jsPDF } = window.jspdf; const doc = new jsPDF({ orientation: "landscape" }); doc.setFontSize(13); doc.text(title, 14, 15); const cols = Object.keys(rows[0]); doc.autoTable({ head: [cols], body: rows.map((r) => cols.map((c) => typeof r[c] === "number" ? r[c].toLocaleString("tr-TR") : (r[c] ?? ""))), startY: 21, styles: { fontSize: 8 } }); doc.save(name); }
+// koşan bakiyeli cari döküm — { tarih, aciklama, alacak, borc } dizisini tarihe göre sıralayıp kümülatif bakiye ekler
+function cariLedger(entries) {
+  const sorted = [...entries].sort((a, b) => a.tarih.localeCompare(b.tarih));
+  let bal = 0;
+  return sorted.map(e => { bal += (e.alacak || 0) - (e.borc || 0); return { Tarih: dstr(e.tarih), Aciklama: e.aciklama, Alacak: e.alacak || 0, Borc: e.borc || 0, Bakiye: bal }; });
+}
+// dlPdf ile aynı, sadece negatif Bakiye'yi kırmızı gösterir (Excel'de SheetJS ücretsiz sürüm hücre rengini desteklemiyor, bu yüzden sadece PDF'te var)
+function dlPdfLedger(rows, name, title) {
+  if (!rows.length) { toast("Veri yok"); return; }
+  const { jsPDF } = window.jspdf; const doc = new jsPDF({ orientation: "landscape" });
+  doc.setFontSize(13); doc.text(title, 14, 15);
+  const cols = ["Tarih", "Aciklama", "Alacak", "Borc", "Bakiye"];
+  doc.autoTable({
+    head: [cols],
+    body: rows.map(r => cols.map(c => typeof r[c] === "number" ? r[c].toLocaleString("tr-TR") : (r[c] ?? ""))),
+    startY: 21, styles: { fontSize: 8 },
+    didParseCell: (d) => { if (d.section === "body" && d.column.index === 4 && rows[d.row.index].Bakiye < 0) d.cell.styles.textColor = [200, 30, 30]; },
+  });
+  doc.save(name);
+}
 
 async function renderRaporlar() {
   const el = $("page-raporlar");
@@ -1078,24 +1114,50 @@ async function renderRaporlar() {
       <div class="panel"><h3>Cari Hesap Dökümü (Tarih Aralığı)</h3><div style="font-size:12px;color:var(--dim);margin-bottom:10px;">Müşteri hareketleri</div><button class="btn btn-amber btn-sm" id="rCx">📊 Excel</button> <button class="btn btn-outline btn-sm" id="rCp">📄 PDF</button></div>
       <div class="panel"><h3>Gider Dökümü (Tarih Aralığı)</h3><div style="font-size:12px;color:var(--dim);margin-bottom:10px;">Kategori + proje + yöntem + ekleyen</div><button class="btn btn-amber btn-sm" id="rGx">📊 Excel</button> <button class="btn btn-outline btn-sm" id="rGp">📄 PDF</button></div>
       <div class="panel"><h3>Malzemeci Dökümü (Tarih Aralığı)</h3><div style="font-size:12px;color:var(--dim);margin-bottom:10px;">Alım / ödeme / kalan borç</div><button class="btn btn-amber btn-sm" id="rSx">📊 Excel</button> <button class="btn btn-outline btn-sm" id="rSp">📄 PDF</button></div>
+      <div class="panel"><h3>İşçi Cari Dökümü</h3><div style="font-size:12px;color:var(--dim);margin-bottom:10px;">Puantaj hakedişi (alacak) − avans/ödeme (borç), koşan bakiye</div>
+        <div class="searchrow"><select id="rWorker" style="max-width:200px;"></select><label style="align-self:center;font-size:12px;"><input type="checkbox" id="rWorkerAll"> Tüm Zamanlar</label></div>
+        <button class="btn btn-amber btn-sm" id="rWx">📊 Excel</button> <button class="btn btn-outline btn-sm" id="rWp">📄 PDF</button>
+        <div style="font-size:11px;color:var(--dim);margin-top:6px;">Maaşlı işçilerde aylık tahakkuk bu dökümde ayrı satır olarak görünmez (henüz takip edilmiyor).</div>
+      </div>
+      <div class="panel"><h3>Proje/Müşteri Cari Dökümü</h3><div style="font-size:12px;color:var(--dim);margin-bottom:10px;">İşçilik+gider+taşeron+malzemeci (borç) − tahsilat (alacak), koşan bakiye</div>
+        <div class="searchrow"><select id="rProj" style="max-width:200px;"></select><label style="align-self:center;font-size:12px;"><input type="checkbox" id="rProjAll"> Tüm Zamanlar</label></div>
+        <button class="btn btn-amber btn-sm" id="rPCx">📊 Excel</button> <button class="btn btn-outline btn-sm" id="rPCp">📄 PDF</button>
+      </div>
       <div class="panel"><h3>🗄️ TAM YEDEK — Tüm Veriler</h3><div style="font-size:12px;color:var(--dim);margin-bottom:10px;">Bütün tablolar tek Excel dosyasında, her tablo ayrı sayfa. Ay sonu arşivi için.</div><button class="btn btn-green btn-sm" id="rFull">📦 Tam Yedek İndir</button></div>
     </div>`;
+  const [rWorkers, rProjs] = await Promise.all([q("workers", { order: "name", asc: true }), q("projects", { order: "name", asc: true })]);
+  $("rWorker").innerHTML = rWorkers.map((w) => `<option value="${w.id}">${esc(w.name)}</option>`).join("") || '<option value="">İşçi yok</option>';
+  $("rProj").innerHTML = rProjs.map((p) => `<option value="${p.id}">${esc(p.name)}</option>`).join("") || '<option value="">Proje yok</option>';
 
+  async function isciCari(workerId, allMode, start, end) {
+    const filt = (key) => allMode ? {} : { gte: { [key]: start }, lte: { [key]: end } };
+    const [w, projs, att, adv, pay] = await Promise.all([
+      q("workers", { eq: { id: workerId } }).then(r => r[0]),
+      q("projects"),
+      q("attendance", { eq: { worker_id: workerId }, ...filt("work_date") }),
+      q("advances", { eq: { worker_id: workerId }, ...filt("tx_date") }),
+      q("payments", { eq: { worker_id: workerId }, ...filt("tx_date") }),
+    ]);
+    const pn = {}; projs.forEach(p => pn[p.id] = p.name);
+    const entries = [
+      ...att.filter(a => +a.wage_amount > 0).map(a => ({ tarih: a.work_date, aciklama: `Puantaj: ${pn[a.project_id] || "proje yok"} (${frLabel(a.fraction || 1)} gün)`, alacak: +a.wage_amount, borc: 0 })),
+      ...adv.map(a => ({ tarih: a.tx_date, aciklama: "Avans" + (a.note ? " — " + a.note : ""), alacak: 0, borc: +a.amount })),
+      ...pay.map(p2 => ({ tarih: p2.tx_date, aciklama: "Ödeme" + (p2.note ? " — " + p2.note : ""), alacak: 0, borc: +p2.amount })),
+    ];
+    return { worker: w, rows: cariLedger(entries) };
+  }
   async function hakedis(mk) {
     const { start, end } = monthRange(mk);
     const [workers, att, adv, pay] = await Promise.all([q("workers"), q("attendance", { gte: { work_date: start }, lte: { work_date: end } }), q("advances", { gte: { tx_date: start }, lte: { tx_date: end } }), q("payments", { gte: { tx_date: start }, lte: { tx_date: end } })]);
     return workers.map((w) => {
-      const g = att.filter((a) => a.worker_id === w.id);
-      const gun = g.reduce((s, a) => s + +(a.fraction || 1), 0);
-      const brut = w.wage_type === "maasli" ? +w.monthly_salary : g.reduce((s, a) => s + +a.wage_amount, 0);
-      const a = adv.filter((x) => x.worker_id === w.id).reduce((s, x) => s + +x.amount, 0);
-      const p = pay.filter((x) => x.worker_id === w.id).reduce((s, x) => s + +x.amount, 0);
-      return { Isci: w.name, Tip: w.wage_type, Gun: w.wage_type === "maasli" ? "" : gun, Yevmiye: +w.daily_wage, Brut: brut, Avans: a, Odenen: p, NetKalan: brut - a - p };
+      const { brut, gun, avans: a, odeme: p, net } = workerNet(w, att, adv, pay, "month");
+      return { Isci: w.name, Tip: w.wage_type, Gun: w.wage_type === "maasli" ? "" : gun, Yevmiye: +w.daily_wage, Brut: brut, Avans: a, Odenen: p, NetKalan: net };
     });
   }
   async function projeKZ() {
     const [projs, att, exp, cari, subtx, suptx] = await Promise.all([q("projects"), q("attendance"), q("expenses"), q("cari_tx"), q("sub_tx"), q("supplier_tx")]);
     return projs.map((p) => {
+      // NOT: maaşlı işçilerin aylık maaşı burada sayılmıyor — bkz. CLAUDE.md "Bilinen açık konular".
       const isc = att.filter((a) => a.project_id === p.id).reduce((s, a) => s + +a.wage_amount, 0);
       const gid = exp.filter((a) => a.project_id === p.id).reduce((s, a) => s + +a.amount, 0);
       const tas = subtx.filter((a) => a.project_id === p.id && a.direction === "hakedis").reduce((s, a) => s + +a.amount, 0);
@@ -1103,6 +1165,29 @@ async function renderRaporlar() {
       const gel = cari.filter((a) => a.project_id === p.id && a.direction === "hakedis").reduce((s, a) => s + +a.amount, 0);
       return { Proje: p.name, Musteri: p.customer || "", Sozlesme: +p.contract_amount, Gelir: gel, Iscilik: isc, Gider: gid, Taseron: tas, Malzemeci: mal, Net: gel - isc - gid - tas - mal };
     });
+  }
+  async function projeCari(projectId, allMode, start, end) {
+    const filt = (key) => allMode ? {} : { gte: { [key]: start }, lte: { [key]: end } };
+    const [proj, att, exp, subtx, suptx, cari, workers, subs, sups] = await Promise.all([
+      q("projects", { eq: { id: projectId } }).then(r => r[0]),
+      q("attendance", { eq: { project_id: projectId }, ...filt("work_date") }),
+      q("expenses", { eq: { project_id: projectId }, ...filt("tx_date") }),
+      q("sub_tx", { eq: { project_id: projectId }, ...filt("tx_date") }),
+      q("supplier_tx", { eq: { project_id: projectId }, ...filt("tx_date") }),
+      q("cari_tx", { eq: { project_id: projectId }, ...filt("tx_date") }),
+      q("workers"), q("subcontractors"), q("suppliers"),
+    ]);
+    const wn = {}; workers.forEach(w => wn[w.id] = w.name);
+    const sn = {}; subs.forEach(s => sn[s.id] = s.name);
+    const spn = {}; sups.forEach(s => spn[s.id] = s.name);
+    const entries = [
+      ...att.filter(a => +a.wage_amount > 0).map(a => ({ tarih: a.work_date, aciklama: `İşçilik: ${wn[a.worker_id] || "?"} (${frLabel(a.fraction || 1)} gün)`, alacak: 0, borc: +a.wage_amount })),
+      ...exp.map(e => ({ tarih: e.tx_date, aciklama: `Gider: ${e.category}${e.note ? " — " + e.note : ""}`, alacak: 0, borc: +e.amount })),
+      ...subtx.filter(t => t.direction === "hakedis").map(t => ({ tarih: t.tx_date, aciklama: `Taşeron: ${sn[t.sub_id] || "?"}${t.note ? " — " + t.note : ""}`, alacak: 0, borc: +t.amount })),
+      ...suptx.filter(t => t.direction === "borc").map(t => ({ tarih: t.tx_date, aciklama: `Malzemeci: ${spn[t.supplier_id] || "?"}${t.note ? " — " + t.note : ""}`, alacak: 0, borc: +t.amount })),
+      ...cari.filter(t => t.direction === "tahsilat").map(t => ({ tarih: t.tx_date, aciklama: `Tahsilat${t.payment_method ? " (" + t.payment_method + ")" : ""}${t.note ? " — " + t.note : ""}`, alacak: +t.amount, borc: 0 })),
+    ];
+    return { proje: proj, rows: cariLedger(entries) };
   }
   const range = () => ({ start: $("rStart").value, end: $("rEnd").value });
   async function cariDokum() {
@@ -1147,6 +1232,10 @@ async function renderRaporlar() {
   $("rGp").onclick = async () => dlPdf(await giderDokum(), "giderler.pdf", "Gider Dökümü");
   $("rSx").onclick = async () => dlXlsx(await malzemeciDokum(), "malzemeci-dokum.xlsx", "Malzemeciler");
   $("rSp").onclick = async () => dlPdf(await malzemeciDokum(), "malzemeci-dokum.pdf", "Malzemeci Dökümü");
+  $("rWx").onclick = async () => { const { worker, rows } = await isciCari($("rWorker").value, $("rWorkerAll").checked, $("rStart").value, $("rEnd").value); dlXlsx(rows, `isci-cari-${worker.name}.xlsx`, "İşçi Cari"); };
+  $("rWp").onclick = async () => { const { worker, rows } = await isciCari($("rWorker").value, $("rWorkerAll").checked, $("rStart").value, $("rEnd").value); dlPdfLedger(rows, `isci-cari-${worker.name}.pdf`, `İşçi Cari Dökümü — ${worker.name}`); };
+  $("rPCx").onclick = async () => { const { proje, rows } = await projeCari($("rProj").value, $("rProjAll").checked, $("rStart").value, $("rEnd").value); dlXlsx(rows, `proje-cari-${proje.name}.xlsx`, "Proje Cari"); };
+  $("rPCp").onclick = async () => { const { proje, rows } = await projeCari($("rProj").value, $("rProjAll").checked, $("rStart").value, $("rEnd").value); dlPdfLedger(rows, `proje-cari-${proje.name}.pdf`, `Proje/Müşteri Cari Dökümü — ${proje.name}`); };
   $("rFull").onclick = fullBackup;
 }
 
