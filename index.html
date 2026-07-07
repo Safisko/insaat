@@ -206,6 +206,7 @@ table.tbl tr:last-child td{border-bottom:none;}
     <div class="page" id="page-portfoy"></div>
     <div class="page" id="page-raporlar"></div>
     <div class="page" id="page-ayarlar"></div>
+    <div class="page" id="page-detay"></div>
   </div>
 </div>
 <div class="tabbar"><div class="tabbar-inner">
@@ -322,6 +323,22 @@ async function delAtt(id, cb) { // puantaj düzeltmesi herkes yapabilir
   const { error } = await sb.from("attendance").delete().eq("id", id);
   if (error) toast("Silinemedi: " + error.message); else { toast("Silindi"); cb && cb(); }
 }
+async function editAtt(a, w, cb) {
+  const projs = await q("projects", { order: "name", asc: true });
+  const projOpts = projs.map((p) => ({ v: p.id, t: p.name }));
+  openForm("Puantaj Kaydını Düzenle", [
+    { key: "project_id", label: "Proje", type: "select", options: projOpts, required: true },
+    { key: "fraction", label: "Gün Kesri", type: "select", options: FR_OPTS, required: true },
+  ], { project_id: a.project_id, fraction: String(a.fraction || 1) }, async (v) => {
+    const fraction = parseFloat(v.fraction);
+    const others = (await q("attendance", { eq: { worker_id: w.id, work_date: a.work_date } })).filter((x) => x.id !== a.id);
+    const sum = others.reduce((s, x) => s + +(x.fraction || 1), 0);
+    if (sum + fraction > 1.5) { toast("Bu günün toplamı 1,5 günü aşamaz (diğer kayıtlar: " + frLabel(sum) + ")"); return; }
+    if (others.some((x) => x.project_id === v.project_id)) { toast("Bu projeye bu gün için zaten başka bir kayıt var"); return; }
+    await upd("attendance", a.id, { project_id: v.project_id, fraction, wage_amount: Math.round(w.daily_wage * fraction * 100) / 100 });
+    toast("Güncellendi"); cb();
+  });
+}
 
 /* ---------- GİRİŞ / KAYIT ---------- */
 let authMode = "login";
@@ -380,7 +397,7 @@ async function boot() {
 }
 
 /* ---------- gezinme + Diğer menüsü + FAB ---------- */
-const PAGES = { panel: renderPanel, puantaj: renderPuantaj, isciler: renderIsciler, cari: renderCari, malzemeci: renderMalzemeci, giderler: renderGiderler, projeler: renderProjeler, taseron: renderTaseron, portfoy: renderPortfoy, raporlar: renderRaporlar, ayarlar: renderAyarlar };
+const PAGES = { panel: renderPanel, puantaj: renderPuantaj, isciler: renderIsciler, cari: renderCari, malzemeci: renderMalzemeci, giderler: renderGiderler, projeler: renderProjeler, taseron: renderTaseron, portfoy: renderPortfoy, raporlar: renderRaporlar, ayarlar: renderAyarlar, detay: renderDetay };
 function nav(p) {
   if (p === "diger") {
     const box = $("modalBox");
@@ -602,22 +619,6 @@ async function renderPuantaj() {
     } catch (e) { toast("Eklenemedi: " + (e.message || e)); return false; }
   }
 
-  async function editAtt(a, w, cb) {
-    const projOpts = projs.map((p) => ({ v: p.id, t: p.name }));
-    openForm("Puantaj Kaydını Düzenle", [
-      { key: "project_id", label: "Proje", type: "select", options: projOpts, required: true },
-      { key: "fraction", label: "Gün Kesri", type: "select", options: FR_OPTS, required: true },
-    ], { project_id: a.project_id, fraction: String(a.fraction || 1) }, async (v) => {
-      const fraction = parseFloat(v.fraction);
-      const others = (await q("attendance", { eq: { worker_id: w.id, work_date: a.work_date } })).filter((x) => x.id !== a.id);
-      const sum = others.reduce((s, x) => s + +(x.fraction || 1), 0);
-      if (sum + fraction > 1.5) { toast("Bu günün toplamı 1,5 günü aşamaz (diğer kayıtlar: " + frLabel(sum) + ")"); return; }
-      if (others.some((x) => x.project_id === v.project_id)) { toast("Bu projeye bu gün için zaten başka bir kayıt var"); return; }
-      await upd("attendance", a.id, { project_id: v.project_id, fraction, wage_amount: Math.round(w.daily_wage * fraction * 100) / 100 });
-      toast("Güncellendi"); cb();
-    });
-  }
-
   async function loadDay() {
     const d = $("puDate").value;
     const att = await q("attendance", { eq: { work_date: d } });
@@ -707,6 +708,281 @@ async function renderPuantaj() {
   loadDay();
 }
 
+/* ---------- Kişisel Detay Sekmesi (işçi/müşteri/malzemeci/taşeron ortak dökümü) ---------- */
+let detayState = null;
+function showDetay(type, id, backTo) {
+  detayState = { type, id, backTo };
+  nav("detay");
+}
+
+const DETAY_KIND_LABEL = { isci: "İşçi", musteri: "Müşteri", malzemeci: "Malzemeci", taseron: "Taşeron" };
+
+async function renderDetay() {
+  const el = $("page-detay");
+  el.innerHTML = `<div class="page-head"><h2>Detay</h2></div><div class="empty">Yükleniyor…</div>`;
+  const st = detayState;
+  if (!st) { el.innerHTML = '<div class="empty">Kayıt seçilmedi. Lütfen bir liste sayfasından "Detay" ile açın.</div>'; return; }
+  const loaders = { isci: detayIsci, musteri: detayMusteri, malzemeci: detayMalzemeci, taseron: detayTaseron };
+  const data = await loaders[st.type](st.id);
+  if (!data) { el.innerHTML = `<div class="page-head"><button class="btn btn-outline btn-sm" id="detayBack">← Geri</button></div><div class="empty">Kayıt bulunamadı (silinmiş olabilir).</div>`;
+    $("detayBack").onclick = () => nav(st.backTo || "panel"); return; }
+
+  const rowsHtml = data.rows.map((r) => `<tr>
+      <td>${dstr(r.tarih)}</td>
+      <td><span class="pill">${esc(r.tur)}</span></td>
+      <td>${r.aciklama}</td>
+      <td class="mono ${r.tutar >= 0 ? "v-green" : "v-red"}">${fmtS(r.tutar)}</td>
+      <td class="mono ${r.bakClass}">${fmtS(r.bakiye)}</td>
+      <td class="rowact"><button class="btn btn-outline btn-sm" data-dedit="${r.key}">✎</button><button class="btn btn-danger btn-sm" data-ddel="${r.key}">🗑</button></td>
+    </tr>`).join("");
+
+  el.innerHTML = `
+    <div class="page-head">
+      <h2>${DETAY_KIND_LABEL[st.type]} — ${esc(data.title)}</h2>
+      <button class="btn btn-outline btn-sm" id="detayBack">← Geri</button>
+    </div>
+    ${data.statsHtml || ""}
+    <div class="panel"><h3>Tüm Hareketler (${data.rows.length})</h3>
+      <div class="tblwrap"><table class="tbl">
+        <tr><th>Tarih</th><th>Tür</th><th>Açıklama</th><th>Tutar</th><th>Bakiye</th><th></th></tr>
+        ${rowsHtml || `<tr><td colspan="6" class="empty">Henüz kayıt yok</td></tr>`}
+      </table></div>
+    </div>`;
+
+  $("detayBack").onclick = () => nav(st.backTo || "panel");
+  const byKey = {}; data.rows.forEach((r) => byKey[r.key] = r);
+  el.querySelectorAll("[data-dedit]").forEach((b) => b.onclick = () => byKey[b.dataset.dedit].editFn(() => renderDetay()));
+  el.querySelectorAll("[data-ddel]").forEach((b) => b.onclick = () => byKey[b.dataset.ddel].delFn(() => renderDetay()));
+}
+
+/* --- Loader: İşçi (puantaj + avans + ödeme, kronolojik, koşan bakiye) --- */
+async function detayIsci(workerId) {
+  const [w, projs, att, adv, pay] = await Promise.all([
+    q("workers", { eq: { id: workerId } }).then((r) => r[0]),
+    q("projects"),
+    q("attendance", { eq: { worker_id: workerId } }),
+    q("advances", { eq: { worker_id: workerId } }),
+    q("payments", { eq: { worker_id: workerId } }),
+  ]);
+  if (!w) return null;
+  const pn = {}; projs.forEach((p) => pn[p.id] = p.name);
+  const entries = [];
+  att.forEach((a) => entries.push({
+    key: "att_" + a.id, tarih: a.work_date, tur: "puantaj",
+    aciklama: esc(pn[a.project_id] || "proje yok") + " · " + esc(frLabel(a.fraction || 1)) + " gün",
+    tutar: +a.wage_amount || 0,
+    editFn: (cb) => editAtt(a, w, cb),
+    delFn: (cb) => delAtt(a.id, cb),
+  }));
+  adv.forEach((a) => entries.push({
+    key: "adv_" + a.id, tarih: a.tx_date, tur: "avans",
+    aciklama: esc(a.note || "") + (a.payment_method ? ' <span class="pill">' + esc(a.payment_method) + "</span>" : ""),
+    tutar: -(+a.amount || 0),
+    editFn: (cb) => editAvansOdeme("advances", a, cb),
+    delFn: (cb) => del("advances", a.id, cb),
+  }));
+  pay.forEach((p) => entries.push({
+    key: "pay_" + p.id, tarih: p.tx_date, tur: "ödeme",
+    aciklama: esc(p.note || "") + (p.payment_method ? ' <span class="pill">' + esc(p.payment_method) + "</span>" : ""),
+    tutar: -(+p.amount || 0),
+    editFn: (cb) => editAvansOdeme("payments", p, cb),
+    delFn: (cb) => del("payments", p.id, cb),
+  }));
+  entries.sort((a, b) => a.tarih.localeCompare(b.tarih));
+  let bal = 0;
+  entries.forEach((e) => { bal += e.tutar; e.bakiye = bal; e.bakClass = bal > 0 ? "v-steel" : "v-green"; });
+
+  const { net } = workerNet(w, att, adv, pay, "all");
+  const statsHtml = `<div class="grid c4" style="margin-bottom:14px;">
+    <div class="stat"><div class="lbl">Ücret</div><div class="val">${w.wage_type === "maasli" ? fmt(w.monthly_salary) + "/ay" : fmt(w.daily_wage) + "/gün"}</div></div>
+    <div class="stat"><div class="lbl">Toplam Avans</div><div class="val v-steel">${fmt(adv.reduce((s, x) => s + +x.amount, 0))}</div></div>
+    <div class="stat"><div class="lbl">Toplam Ödeme</div><div class="val v-green">${fmt(pay.reduce((s, x) => s + +x.amount, 0))}</div></div>
+    <div class="stat"><div class="lbl">Net (Tüm Zamanlar)</div><div class="val ${net > 0 ? "v-steel" : "v-green"}">${fmtS(net)}</div></div>
+  </div>`;
+  return { title: w.name, statsHtml, rows: entries };
+}
+
+/* --- Loader: Müşteri (cari_tx: hakediş +, tahsilat −) --- */
+async function detayMusteri(customerId) {
+  const [c, projs, txs] = await Promise.all([
+    q("customers", { eq: { id: customerId } }).then((r) => r[0]),
+    q("projects"),
+    q("cari_tx", { eq: { customer_id: customerId } }),
+  ]);
+  if (!c) return null;
+  const pn = {}; projs.forEach((p) => pn[p.id] = p.name);
+  const entries = txs.map((t) => ({
+    key: "cari_" + t.id, tarih: t.tx_date, tur: t.direction === "hakedis" ? "hakediş" : "tahsilat",
+    aciklama: esc(t.note || "") + (t.project_id ? ' <span class="pill">' + esc(pn[t.project_id] || "") + "</span>" : "") + (t.payment_method ? ' <span class="pill">' + esc(t.payment_method) + "</span>" : ""),
+    tutar: t.direction === "hakedis" ? +t.amount : -(+t.amount),
+    editFn: (cb) => editCariTx(t, cb),
+    delFn: (cb) => del("cari_tx", t.id, cb),
+  }));
+  entries.sort((a, b) => a.tarih.localeCompare(b.tarih));
+  let bal = 0;
+  entries.forEach((e) => { bal += e.tutar; e.bakiye = bal; e.bakClass = bal > 0 ? "v-amber" : "v-green"; });
+
+  const hak = txs.filter((t) => t.direction === "hakedis").reduce((s, t) => s + +t.amount, 0);
+  const tah = txs.filter((t) => t.direction === "tahsilat").reduce((s, t) => s + +t.amount, 0);
+  const statsHtml = `<div class="grid c4" style="margin-bottom:14px;">
+    <div class="stat"><div class="lbl">Hakediş</div><div class="val v-amber">${fmt(hak)}</div></div>
+    <div class="stat"><div class="lbl">Tahsilat</div><div class="val v-green">${fmt(tah)}</div></div>
+    <div class="stat"><div class="lbl">Kalan</div><div class="val ${hak - tah > 0 ? "v-amber" : "v-green"}">${fmtS(hak - tah)}</div></div>
+    <div class="stat"><div class="lbl">Telefon</div><div class="val" style="font-size:14px;">${esc(c.phone || "—")}</div></div>
+  </div>`;
+  return { title: c.name, statsHtml, rows: entries };
+}
+
+/* --- Loader: Malzemeci (supplier_tx: borç(alım) +, ödeme −) --- */
+async function detayMalzemeci(supplierId) {
+  const [sp, projs, txs] = await Promise.all([
+    q("suppliers", { eq: { id: supplierId } }).then((r) => r[0]),
+    q("projects"),
+    q("supplier_tx", { eq: { supplier_id: supplierId } }),
+  ]);
+  if (!sp) return null;
+  const pn = {}; projs.forEach((p) => pn[p.id] = p.name);
+  const entries = txs.map((t) => ({
+    key: "sup_" + t.id, tarih: t.tx_date, tur: t.direction === "borc" ? "alım" : "ödeme",
+    aciklama: esc(t.note || "") + (t.price_pending ? ' <span class="pending">fiyat bekliyor</span>' : "")
+      + (t.project_id ? ' <span class="pill">' + esc(pn[t.project_id] || "") + "</span>" : "")
+      + (t.payment_method ? ' <span class="pill">' + esc(t.payment_method) + "</span>" : "")
+      + (t.photo_url ? ` <a href="${t.photo_url}" target="_blank" style="color:var(--steel);">📎 fiş</a>` : ""),
+    tutar: t.direction === "borc" ? +t.amount : -(+t.amount),
+    editFn: (cb) => (t.direction === "borc" ? alimForm(sp.id, t, cb) : odeForm(sp.id, t, cb)),
+    delFn: (cb) => del("supplier_tx", t.id, cb),
+  }));
+  entries.sort((a, b) => a.tarih.localeCompare(b.tarih));
+  let bal = 0;
+  entries.forEach((e) => { bal += e.tutar; e.bakiye = bal; e.bakClass = bal > 0 ? "v-red" : "v-green"; });
+
+  const borc = txs.filter((t) => t.direction === "borc").reduce((s, t) => s + +t.amount, 0);
+  const ode = txs.filter((t) => t.direction === "odeme").reduce((s, t) => s + +t.amount, 0);
+  const statsHtml = `<div class="grid c4" style="margin-bottom:14px;">
+    <div class="stat"><div class="lbl">Alım</div><div class="val v-red">${fmt(borc)}</div></div>
+    <div class="stat"><div class="lbl">Ödenen</div><div class="val v-green">${fmt(ode)}</div></div>
+    <div class="stat"><div class="lbl">Kalan Borcumuz</div><div class="val ${borc - ode > 0 ? "v-red" : "v-green"}">${fmtS(borc - ode)}</div></div>
+    <div class="stat"><div class="lbl">Telefon</div><div class="val" style="font-size:14px;">${esc(sp.phone || "—")}</div></div>
+  </div>`;
+  return { title: sp.name, statsHtml, rows: entries };
+}
+
+/* --- Loader: Taşeron (sub_tx: hakediş +, ödeme −) — önceden tekil satır hiç render edilmiyordu --- */
+async function detayTaseron(subId) {
+  const [sc, projs, txs] = await Promise.all([
+    q("subcontractors", { eq: { id: subId } }).then((r) => r[0]),
+    q("projects"),
+    q("sub_tx", { eq: { sub_id: subId } }),
+  ]);
+  if (!sc) return null;
+  const pn = {}; projs.forEach((p) => pn[p.id] = p.name);
+  const entries = txs.map((t) => ({
+    key: "sub_" + t.id, tarih: t.tx_date, tur: t.direction === "hakedis" ? "hakediş" : "ödeme",
+    aciklama: esc(t.note || "") + (t.project_id ? ' <span class="pill">' + esc(pn[t.project_id] || "") + "</span>" : ""),
+    tutar: t.direction === "hakedis" ? +t.amount : -(+t.amount),
+    editFn: (cb) => editSubTx(t, cb),
+    delFn: (cb) => del("sub_tx", t.id, cb),
+  }));
+  entries.sort((a, b) => a.tarih.localeCompare(b.tarih));
+  let bal = 0;
+  entries.forEach((e) => { bal += e.tutar; e.bakiye = bal; e.bakClass = bal > 0 ? "v-steel" : "v-green"; });
+
+  const hak = txs.filter((t) => t.direction === "hakedis").reduce((s, t) => s + +t.amount, 0);
+  const ode = txs.filter((t) => t.direction === "odeme").reduce((s, t) => s + +t.amount, 0);
+  const statsHtml = `<div class="grid c4" style="margin-bottom:14px;">
+    <div class="stat"><div class="lbl">Hakediş</div><div class="val v-amber">${fmt(hak)}</div></div>
+    <div class="stat"><div class="lbl">Ödenen</div><div class="val v-green">${fmt(ode)}</div></div>
+    <div class="stat"><div class="lbl">Kalan Borcumuz</div><div class="val v-steel">${fmtS(hak - ode)}</div></div>
+    <div class="stat"><div class="lbl">İş Kalemi</div><div class="val" style="font-size:14px;">${esc(sc.job || "—")}</div></div>
+  </div>`;
+  return { title: sc.name, statsHtml, rows: entries };
+}
+
+/* --- Edit: Avans / Ödeme (işçi cari) --- */
+async function editAvansOdeme(table, row, cb) {
+  openForm(table === "advances" ? "Avans Kaydını Düzenle" : "Ödeme Kaydını Düzenle", [
+    { key: "amount", label: "Tutar (TL)", type: "number", required: true },
+    { key: "tx_date", label: "Tarih", type: "date", required: true },
+    payField,
+    { key: "note", label: "Açıklama" },
+  ], row, async (v) => {
+    await upd(table, row.id, v);
+    toast("Güncellendi"); cb();
+  });
+}
+
+/* --- Edit: Cari (Müşteri) hareketi — direction sabit kalır --- */
+async function editCariTx(row, cb) {
+  const projs = await q("projects", { order: "name", asc: true });
+  const projOpts = [{ v: "", t: "Proje yok" }].concat(projs.map((p) => ({ v: p.id, t: p.name })));
+  openForm(row.direction === "hakedis" ? "Hakediş Kaydını Düzenle" : "Tahsilat Kaydını Düzenle", [
+    { key: "amount", label: "Tutar (TL)", type: "number", required: true },
+    { key: "tx_date", label: "Tarih", type: "date", required: true },
+    payField,
+    { key: "project_id", label: "Proje (kâr/zarar için)", type: "select", options: projOpts },
+    { key: "note", label: "Açıklama" },
+  ], row, async (v) => {
+    await upd("cari_tx", row.id, v);
+    toast("Güncellendi"); cb();
+  });
+}
+
+/* --- Edit: Taşeron hareketi — önceden hiç yoktu --- */
+async function editSubTx(row, cb) {
+  const projs = await q("projects", { order: "name", asc: true });
+  const projOpts = [{ v: "", t: "Proje yok" }].concat(projs.map((p) => ({ v: p.id, t: p.name })));
+  openForm(row.direction === "hakedis" ? "Taşeron Hakedişini Düzenle" : "Taşeron Ödemesini Düzenle", [
+    { key: "amount", label: "Tutar (TL)", type: "number", required: true },
+    { key: "tx_date", label: "Tarih", type: "date", required: true },
+    { key: "project_id", label: "Proje (maliyet için)", type: "select", options: projOpts },
+    { key: "note", label: "Açıklama" },
+  ], row, async (v) => {
+    await upd("sub_tx", row.id, v);
+    toast("Güncellendi"); cb();
+  });
+}
+
+/* --- Malzemeci alım/ödeme formları: globale taşındı, hem Malzemeciler sayfası hem Detay kullanır --- */
+async function alimForm(sid, existing, cb) {
+  const projs = await q("projects", { order: "name", asc: true });
+  const projOpts = [{ v: "", t: "Proje yok" }].concat(projs.map((p) => ({ v: p.id, t: p.name })));
+  openForm(existing ? "Alımı Düzenle" : "Veresiye Alım (borçlanma)", [
+    { key: "price_pending", label: "Fiyat durumu", type: "select", options: [{ v: "0", t: "Fiyat belli (tutar girilecek)" }, { v: "1", t: "Fiyat sonra belli olacak (teslim fişi)" }] },
+    { key: "amount", label: "Tutar (TL — fiyat bekliyorsa 0 bırakın)", type: "number" },
+    { key: "tx_date", label: "Tarih", type: "date", def: today() },
+    { key: "project_id", label: "Proje (maliyet için)", type: "select", options: projOpts },
+    { key: "note", label: "Açıklama (ne alındı)" },
+    { key: "photo", label: "Teslim fişi / fatura fotoğrafı", type: "file" },
+  ], existing ? { ...existing, price_pending: existing.price_pending ? "1" : "0" } : { price_pending: "0" }, async (v) => {
+    const pending = v.price_pending === "1";
+    const amount = pending ? (v.amount || 0) : v.amount;
+    if (!pending && (!amount || amount <= 0)) { toast("Tutar gerekli (ya da 'fiyat sonra' seçin)"); return; }
+    const url = v.photo ? await uploadPhoto(v.photo) : null;
+    const row = { amount: amount || 0, tx_date: v.tx_date, project_id: v.project_id, note: v.note, price_pending: pending };
+    if (url) row.photo_url = url;
+    if (existing) { await upd("supplier_tx", existing.id, row); toast("Güncellendi"); }
+    else {
+      if (!(await checkDup("supplier_tx", { supplier_id: sid, tx_date: v.tx_date, amount: row.amount, direction: "borc" }))) return;
+      await ins("supplier_tx", { supplier_id: sid, direction: "borc", ...row }); toast("Alım kaydedildi");
+    }
+    cb && cb();
+  });
+}
+async function odeForm(sid, existing, cb) {
+  openForm(existing ? "Ödemeyi Düzenle" : "Malzemeciye Ödeme", [
+    { key: "amount", label: "Tutar (TL)", type: "number", required: true },
+    { key: "tx_date", label: "Tarih", type: "date", def: today() },
+    payField, { key: "note", label: "Açıklama" },
+  ], existing || null, async (v) => {
+    if (existing) { await upd("supplier_tx", existing.id, v); toast("Güncellendi"); }
+    else {
+      if (!(await checkDup("supplier_tx", { supplier_id: sid, tx_date: v.tx_date, amount: v.amount, direction: "odeme" }))) return;
+      await ins("supplier_tx", { supplier_id: sid, direction: "odeme", ...v }); toast("Ödeme kaydedildi");
+    }
+    cb && cb();
+  });
+}
+
 /* ---------- İŞÇİLER ---------- */
 async function renderIsciler() {
   const el = $("page-isciler");
@@ -748,6 +1024,7 @@ async function renderIsciler() {
         <td class="rowact">
           <button class="btn btn-outline btn-sm" data-avans="${w.id}">Avans</button>
           <button class="btn btn-green btn-sm" data-ode="${w.id}">Ödeme</button>
+          <button class="btn btn-outline btn-sm" data-detay="${w.id}">📄 Detay</button>
           <button class="btn btn-outline btn-sm" data-edit="${w.id}">✎</button>
           <button class="btn btn-danger btn-sm" data-del="${w.id}">🗑</button>
         </td></tr>`;
@@ -790,6 +1067,7 @@ async function renderIsciler() {
     });
     $("wTable").querySelectorAll("[data-avans]").forEach((b) => b.onclick = () => txForm(b.dataset.avans, "advances", wBy[b.dataset.avans].name + " — Avans"));
     $("wTable").querySelectorAll("[data-ode]").forEach((b) => b.onclick = () => txForm(b.dataset.ode, "payments", wBy[b.dataset.ode].name + " — Ödeme"));
+    $("wTable").querySelectorAll("[data-detay]").forEach((b) => b.onclick = () => showDetay("isci", b.dataset.detay, "isciler"));
   };
   $("wAdd").onclick = () => openForm("Yeni İşçi", wFields, { active: "true", wage_type: "yevmiyeli" }, async (v) => { v.active = v.active === "true"; await ins("workers", v); toast("İşçi eklendi"); load(); });
   $("wSearch").oninput = load; $("wMonth").onchange = load;
@@ -810,7 +1088,6 @@ async function renderCari() {
       const hak = mine.filter((t) => t.direction === "hakedis").reduce((x, t) => x + +t.amount, 0);
       const tah = mine.filter((t) => t.direction === "tahsilat").reduce((x, t) => x + +t.amount, 0);
       const bak = hak - tah;
-      const rows = mine.slice(0, 6).map((t) => `<tr><td>${dstr(t.tx_date)}</td><td>${t.direction === "hakedis" ? '<span class="pill">hakediş</span>' : '<span class="pill" style="color:var(--green);">tahsilat</span>'}</td><td>${esc(t.note || "")}${t.payment_method ? ' <span class="pill">' + t.payment_method + "</span>" : ""}</td><td class="pill">${esc(t.created_by || "")}</td><td class="mono">${fmt(t.amount)}</td><td class="rowact"><button class="btn btn-danger btn-sm" data-deltx="${t.id}">🗑</button></td></tr>`).join("");
       return `<div class="panel" style="margin-top:12px;">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
           <div><b>${esc(c.name)}</b> ${c.phone ? '<span class="pill">' + esc(c.phone) + "</span>" : ""}<br>
@@ -819,9 +1096,9 @@ async function renderCari() {
           <div class="rowact">
             <button class="btn btn-amber btn-sm" data-hak="${c.id}">+ Hakediş</button>
             <button class="btn btn-green btn-sm" data-tah="${c.id}">+ Tahsilat</button>
+            <button class="btn btn-outline btn-sm" data-detay="${c.id}">📄 Detay</button>
             <button class="btn btn-danger btn-sm" data-del="${c.id}">🗑</button>
-          </div></div>
-        ${rows ? `<div class="tblwrap" style="margin-top:8px;"><table class="tbl">${rows}</table></div>` : ""}</div>`;
+          </div></div></div>`;
     }).join("") || '<div class="empty">Müşteri yok</div>';
     const txForm = (cid, dir) => openForm(dir === "hakedis" ? "Hakediş / Fatura Ekle" : "Tahsilat Ekle", [
       { key: "amount", label: "Tutar (TL)", type: "number", required: true },
@@ -835,8 +1112,8 @@ async function renderCari() {
     });
     $("cList").querySelectorAll("[data-hak]").forEach((b) => b.onclick = () => txForm(b.dataset.hak, "hakedis"));
     $("cList").querySelectorAll("[data-tah]").forEach((b) => b.onclick = () => txForm(b.dataset.tah, "tahsilat"));
+    $("cList").querySelectorAll("[data-detay]").forEach((b) => b.onclick = () => showDetay("musteri", b.dataset.detay, "cari"));
     $("cList").querySelectorAll("[data-del]").forEach((b) => b.onclick = () => del("customers", b.dataset.del, load));
-    $("cList").querySelectorAll("[data-deltx]").forEach((b) => b.onclick = () => del("cari_tx", b.dataset.deltx, load));
   };
   $("cAdd").onclick = () => openForm("Yeni Müşteri", [
     { key: "name", label: "Müşteri Adı", required: true },
@@ -862,13 +1139,6 @@ async function renderMalzemeci() {
       const ode = mine.filter((t) => t.direction === "odeme").reduce((x, t) => x + +t.amount, 0);
       const kalan = borc - ode;
       const bekleyen = mine.filter((t) => t.price_pending).length;
-      const rows = mine.slice(0, 8).map((t) => `<tr>
-        <td>${dstr(t.tx_date)}</td>
-        <td>${t.direction === "borc" ? '<span class="pill">alım</span>' : '<span class="pill" style="color:var(--green);">ödeme</span>'}${t.price_pending ? ' <span class="pending">fiyat bekliyor</span>' : ""}</td>
-        <td>${esc(t.note || "")}${t.project_id ? ' <span class="pill">' + esc(pName[t.project_id] || "") + "</span>" : ""}${t.payment_method ? ' <span class="pill">' + t.payment_method + "</span>" : ""}</td>
-        <td>${t.photo_url ? `<a href="${t.photo_url}" target="_blank" style="color:var(--steel);">📎 fiş</a>` : ""}</td>
-        <td class="mono">${fmt(t.amount)}</td>
-        <td class="rowact"><button class="btn btn-outline btn-sm" data-edittx="${t.id}">✎</button><button class="btn btn-danger btn-sm" data-deltx="${t.id}">🗑</button></td></tr>`).join("");
       return `<div class="panel" style="margin-top:12px;">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
           <div><b>${esc(sp.name)}</b> ${sp.phone ? '<span class="pill">' + esc(sp.phone) + "</span>" : ""}${bekleyen ? ' <span class="pending">' + bekleyen + " fiş fiyat bekliyor</span>" : ""}<br>
@@ -877,49 +1147,14 @@ async function renderMalzemeci() {
           <div class="rowact">
             <button class="btn btn-amber btn-sm" data-alim="${sp.id}">+ Alım</button>
             <button class="btn btn-green btn-sm" data-ode="${sp.id}">+ Ödeme</button>
+            <button class="btn btn-outline btn-sm" data-detay="${sp.id}">📄 Detay</button>
             <button class="btn btn-danger btn-sm" data-del="${sp.id}">🗑</button>
-          </div></div>
-        ${rows ? `<div class="tblwrap" style="margin-top:8px;"><table class="tbl">${rows}</table></div>` : ""}</div>`;
+          </div></div></div>`;
     }).join("") || '<div class="empty">Malzemeci yok. "+ Yeni Malzemeci" ile başlayın.</div>';
 
-    const txBy = {}; txs.forEach((t) => txBy[t.id] = t);
-    const alimForm = (sid, existing) => openForm(existing ? "Alımı Düzenle" : "Veresiye Alım (borçlanma)", [
-      { key: "price_pending", label: "Fiyat durumu", type: "select", options: [{ v: "0", t: "Fiyat belli (tutar girilecek)" }, { v: "1", t: "Fiyat sonra belli olacak (teslim fişi)" }] },
-      { key: "amount", label: "Tutar (TL — fiyat bekliyorsa 0 bırakın)", type: "number" },
-      { key: "tx_date", label: "Tarih", type: "date", def: today() },
-      { key: "project_id", label: "Proje (maliyet için)", type: "select", options: projOpts },
-      { key: "note", label: "Açıklama (ne alındı)" },
-      { key: "photo", label: "Teslim fişi / fatura fotoğrafı", type: "file" },
-    ], existing ? { ...existing, price_pending: existing.price_pending ? "1" : "0" } : { price_pending: "0" }, async (v) => {
-      const pending = v.price_pending === "1";
-      const amount = pending ? (v.amount || 0) : v.amount;
-      if (!pending && (!amount || amount <= 0)) { toast("Tutar gerekli (ya da 'fiyat sonra' seçin)"); return; }
-      const url = v.photo ? await uploadPhoto(v.photo) : null;
-      const row = { amount: amount || 0, tx_date: v.tx_date, project_id: v.project_id, note: v.note, price_pending: pending };
-      if (url) row.photo_url = url;
-      if (existing) { await upd("supplier_tx", existing.id, row); toast("Güncellendi"); }
-      else {
-        if (!(await checkDup("supplier_tx", { supplier_id: sid, tx_date: v.tx_date, amount: row.amount, direction: "borc" }))) return;
-        await ins("supplier_tx", { supplier_id: sid, direction: "borc", ...row }); toast("Alım kaydedildi");
-      }
-      load();
-    });
-    const odeForm = (sid) => openForm("Malzemeciye Ödeme", [
-      { key: "amount", label: "Tutar (TL)", type: "number", required: true },
-      { key: "tx_date", label: "Tarih", type: "date", def: today() },
-      payField, { key: "note", label: "Açıklama" },
-    ], null, async (v) => {
-      if (!(await checkDup("supplier_tx", { supplier_id: sid, tx_date: v.tx_date, amount: v.amount, direction: "odeme" }))) return;
-      await ins("supplier_tx", { supplier_id: sid, direction: "odeme", ...v }); toast("Ödeme kaydedildi"); load();
-    });
-    $("spList").querySelectorAll("[data-alim]").forEach((b) => b.onclick = () => alimForm(b.dataset.alim, null));
-    $("spList").querySelectorAll("[data-ode]").forEach((b) => b.onclick = () => odeForm(b.dataset.ode));
-    $("spList").querySelectorAll("[data-edittx]").forEach((b) => b.onclick = () => {
-      const t = txBy[b.dataset.edittx];
-      if (t.direction === "borc") alimForm(t.supplier_id, t);
-      else toast("Ödemeler düzenlenemez; silip yeniden ekleyin");
-    });
-    $("spList").querySelectorAll("[data-deltx]").forEach((b) => b.onclick = () => del("supplier_tx", b.dataset.deltx, load));
+    $("spList").querySelectorAll("[data-alim]").forEach((b) => b.onclick = () => alimForm(b.dataset.alim, null, load));
+    $("spList").querySelectorAll("[data-ode]").forEach((b) => b.onclick = () => odeForm(b.dataset.ode, null, load));
+    $("spList").querySelectorAll("[data-detay]").forEach((b) => b.onclick = () => showDetay("malzemeci", b.dataset.detay, "malzemeci"));
     $("spList").querySelectorAll("[data-del]").forEach((b) => b.onclick = () => del("suppliers", b.dataset.del, load));
   };
   $("spAdd").onclick = () => openForm("Yeni Malzemeci", [
@@ -1039,6 +1274,7 @@ async function renderTaseron() {
           <div class="rowact">
             <button class="btn btn-amber btn-sm" data-hak="${sc.id}">+ Hakediş</button>
             <button class="btn btn-green btn-sm" data-ode="${sc.id}">+ Ödeme</button>
+            <button class="btn btn-outline btn-sm" data-detay="${sc.id}">📄 Detay</button>
             <button class="btn btn-danger btn-sm" data-del="${sc.id}">🗑</button>
           </div></div></div>`;
     }).join("") || '<div class="empty">Taşeron yok</div>';
@@ -1050,6 +1286,7 @@ async function renderTaseron() {
     ], null, async (v) => { await ins("sub_tx", { sub_id: sid, direction: dir, ...v }); toast("Kaydedildi"); load(); });
     $("sList").querySelectorAll("[data-hak]").forEach((b) => b.onclick = () => txForm(b.dataset.hak, "hakedis"));
     $("sList").querySelectorAll("[data-ode]").forEach((b) => b.onclick = () => txForm(b.dataset.ode, "odeme"));
+    $("sList").querySelectorAll("[data-detay]").forEach((b) => b.onclick = () => showDetay("taseron", b.dataset.detay, "taseron"));
     $("sList").querySelectorAll("[data-del]").forEach((b) => b.onclick = () => del("subcontractors", b.dataset.del, load));
   };
   $("sAdd").onclick = () => openForm("Yeni Taşeron", [
