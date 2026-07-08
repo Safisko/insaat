@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#1C1B19">
+<meta name="theme-color" content="#181309">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="icon" type="image/png" href="icon-192.png">
@@ -17,7 +17,8 @@
 <script src="font-tr.js"></script> <!-- PDF'lerde Türkçe karakter için gömülü font; dosya yoksa PDF varsayılan fontla (bozuk Türkçe) çalışmaya devam eder -->
 <style>
 :root{
-  --bg:#1C1B19; --bg2:#242220; --card:#2A2723; --card2:#332F29;
+  /* Industrial Precision (tasarım incelemesi/DESIGN.md): sıcak koyu zeminler; yazı renkleri DESIGN.md'nin kendi önerisiyle aynı kaldı */
+  --bg:#181309; --bg2:#201B11; --card:#241F14; --card2:#2F291E;
   --border:#3D3833; --text:#EDE7DD; --dim:#A69C8D; --faint:#6E6659;
   --amber:#F0A202; --amber-dim:#4A3A16; --steel:#4F8FC7;
   --danger:#D9534F; --green:#5FA35A;
@@ -33,7 +34,7 @@ h1,h2,h3{font-family:'Space Grotesk',sans-serif;}
 .mono{font-family:'JetBrains Mono',monospace;}
 button{font-family:'Inter',sans-serif;}
 input,select,textarea{background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px 12px;font-size:14px;font-family:'Inter',sans-serif;width:100%;}
-input:focus,select:focus,textarea:focus{outline:none;border-color:var(--amber);}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--amber);box-shadow:0 0 0 3px rgba(240,162,2,.15);}
 .btn{border:none;border-radius:8px;font-weight:600;font-size:13.5px;cursor:pointer;padding:10px 16px;transition:transform .1s,opacity .15s;}
 .btn:active{transform:scale(.97);}
 .btn:disabled{opacity:.5;cursor:default;}
@@ -59,11 +60,11 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--amber);}
 #appScreen{display:none;}
 .shell{display:flex;min-height:100vh;}
 .sidebar{width:210px;background:var(--bg2);border-right:1px solid var(--border);padding:18px 10px;position:fixed;top:0;bottom:0;left:0;overflow-y:auto;z-index:30;}
-.sidebar .brand{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:16px;text-transform:uppercase;letter-spacing:.5px;padding:0 10px 14px;border-bottom:2px solid var(--amber);margin-bottom:12px;}
+.sidebar .brand{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:16px;text-transform:uppercase;letter-spacing:.5px;padding:0 10px 14px;border-bottom:2px solid var(--amber);margin-bottom:12px;color:var(--amber);}
 .sidebar .brand small{display:block;font-weight:400;font-size:10.5px;color:var(--dim);letter-spacing:0;text-transform:none;margin-top:2px;}
-.nav-item{display:flex;align-items:center;gap:9px;padding:10px 12px;border-radius:8px;color:var(--dim);cursor:pointer;font-size:13.5px;margin-bottom:2px;}
+.nav-item{display:flex;align-items:center;gap:9px;padding:10px 12px;border-radius:8px;color:var(--dim);cursor:pointer;font-size:13.5px;margin-bottom:2px;border-left:3px solid transparent;}
 .nav-item:hover{background:var(--card);color:var(--text);}
-.nav-item.active{background:var(--amber-dim);color:var(--amber);font-weight:600;}
+.nav-item.active{background:var(--amber-dim);color:var(--amber);font-weight:600;border-left-color:var(--amber);border-radius:0 8px 8px 0;}
 body.light .nav-item.active{color:#8a5e00;}
 .main{flex:1;margin-left:210px;padding:22px;max-width:1100px;}
 .page{display:none;}
@@ -95,8 +96,8 @@ body.light .nav-item.active{color:#8a5e00;}
 .grid.c2{grid-template-columns:repeat(auto-fit,minmax(200px,1fr));}
 .grid.c4{grid-template-columns:repeat(auto-fit,minmax(160px,1fr));}
 .stat{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;}
-.stat .lbl{font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
-.stat .val{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:18px;}
+.stat .lbl{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;}
+.stat .val{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:22px;letter-spacing:-0.02em;}
 .v-amber{color:var(--amber);} .v-steel{color:var(--steel);} .v-green{color:var(--green);} .v-red{color:var(--danger);}
 body.light .v-amber{color:#b07700;}
 .panel{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:14px;}
@@ -235,7 +236,7 @@ table.tbl tr:last-child td{border-bottom:none;}
    URL hazır girildi; sadece Publishable key'inizi yazın.
    ===================================================== */
 const SUPABASE_URL = "https://yvbbojujrouiscasgfpl.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_ecNHncTWwCmL8AhGp16V4w_XA6lWPOT";   // sb_publishable_... ile başlayan anahtar
+const SUPABASE_ANON_KEY = "BURAYA_PUBLISHABLE_KEY";   // sb_publishable_... ile başlayan anahtar
 /* ===================================================== */
 
 const CFG_OK = SUPABASE_URL.startsWith("https://") && SUPABASE_ANON_KEY.length > 30;
