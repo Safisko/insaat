@@ -235,7 +235,7 @@ table.tbl tr:last-child td{border-bottom:none;}
    URL hazır girildi; sadece Publishable key'inizi yazın.
    ===================================================== */
 const SUPABASE_URL = "https://yvbbojujrouiscasgfpl.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_ecNHncTWwCmL8AhGp16V4w_XA6lWPOT";   // sb_publishable_... ile başlayan anahtar
+const SUPABASE_ANON_KEY = "BURAYA_PUBLISHABLE_KEY";   // sb_publishable_... ile başlayan anahtar
 /* ===================================================== */
 
 const CFG_OK = SUPABASE_URL.startsWith("https://") && SUPABASE_ANON_KEY.length > 30;
@@ -1521,22 +1521,45 @@ async function sonFetch(filterKey) {
   return rows;
 }
 
-let sonState = { filter: "hepsi", page: 0, search: "" };
-function showSonlar(filterKey) { sonState = { filter: filterKey || "hepsi", page: 0, search: "" }; nav("sonlar"); }
+// Müşteriye özel: o müşterinin cari_tx'leri + TÜM projelerindeki her kalem (giriş zamanına göre)
+async function sonFetchMusteri(customerId) {
+  const [maps, projs, cust, cari, att, exp, suptx, subtx, hiz] = await Promise.all([
+    sonMaps(), q("projects"),
+    q("customers", { eq: { id: customerId } }).then((r) => r[0]),
+    q("cari_tx", { eq: { customer_id: customerId } }),
+    q("attendance"), q("expenses"), q("supplier_tx"), q("sub_tx"), q("services"),
+  ]);
+  const myProjIds = new Set(projs.filter((p) => p.customer_id === customerId || (p.customer && cust && p.customer.toLowerCase().trim() === cust.name.toLowerCase().trim())).map((p) => p.id));
+  const rows = [];
+  cari.forEach((r) => rows.push(sonRow(r.direction === "hakedis" ? "hakedis" : "tahsilat", r, maps)));
+  att.filter((a) => myProjIds.has(a.project_id)).forEach((a) => rows.push(sonRow("puantaj", a, maps)));
+  exp.filter((e) => myProjIds.has(e.project_id)).forEach((e) => rows.push(sonRow("gider", e, maps)));
+  suptx.filter((t) => myProjIds.has(t.project_id)).forEach((t) => rows.push(sonRow(t.direction === "borc" ? "alim" : "modeme", t, maps)));
+  subtx.filter((t) => myProjIds.has(t.project_id)).forEach((t) => rows.push(sonRow(t.direction === "hakedis" ? "thakedis" : "todeme", t, maps)));
+  hiz.filter((h) => myProjIds.has(h.project_id)).forEach((h) => rows.push(sonRow("hizmet", h, maps)));
+  rows.sort((a, b) => String(b.zaman || "").localeCompare(String(a.zaman || "")));
+  return rows;
+}
+
+let sonState = { filter: "hepsi", page: 0, search: "", customerId: null, customerName: "" };
+function showSonlar(filterKey) { sonState = { filter: filterKey || "hepsi", page: 0, search: "", customerId: null, customerName: "" }; nav("sonlar"); }
+function showSonlarMusteri(customerId, name) { sonState = { filter: "hepsi", page: 0, search: "", customerId, customerName: name || "" }; nav("sonlar"); }
 
 async function renderSonlar() {
   const el = $("page-sonlar");
+  const isMusteri = !!sonState.customerId;
   const filtOpts = Object.entries(SON_FILTERS).map(([k, f]) => `<option value="${k}" ${k === sonState.filter ? "selected" : ""}>${f.t}</option>`).join("");
-  el.innerHTML = `<div class="page-head"><h2>🕒 Son Hareketler</h2><span class="userbadge">giriş zamanına göre — en yeni üstte</span></div>
+  el.innerHTML = `<div class="page-head"><h2>🕒 ${isMusteri ? esc(sonState.customerName) + " — " : ""}Son Hareketler</h2><span class="userbadge">giriş zamanına göre — en yeni üstte${isMusteri ? " · bu müşterinin tüm projeleri" : ""}</span></div>
     <div class="searchrow">
-      <select id="sonFilter" style="max-width:250px;">${filtOpts}</select>
+      ${isMusteri ? '<button class="btn btn-outline btn-sm" id="sonBack">← Cari\'ye dön</button>' : `<select id="sonFilter" style="max-width:250px;">${filtOpts}</select>`}
       <input id="sonSearch" placeholder="Açıklama / isim / kim ara…" value="${esc(sonState.search)}" style="max-width:220px;">
     </div>
     <div id="sonList" class="empty">Yükleniyor…</div>
     <div class="searchrow" id="sonPager" style="justify-content:center;margin-top:10px;gap:12px;"></div>`;
-  $("sonFilter").onchange = () => { sonState.filter = $("sonFilter").value; sonState.page = 0; sonState.search = $("sonSearch").value; renderSonlar(); };
+  if (isMusteri) $("sonBack").onclick = () => nav("cari");
+  else $("sonFilter").onchange = () => { sonState.filter = $("sonFilter").value; sonState.page = 0; sonState.search = $("sonSearch").value; renderSonlar(); };
   const PAGEN = 50;
-  const all = await sonFetch(sonState.filter);
+  const all = isMusteri ? await sonFetchMusteri(sonState.customerId) : await sonFetch(sonState.filter);
   const draw = () => {
     const s = (sonState.search || "").toLowerCase();
     const filtered = s ? all.filter((r) => stripHtml(r.aciklama).toLowerCase().includes(s) || r.tur.toLowerCase().includes(s) || (r.kim || "").toLowerCase().includes(s)) : all;
@@ -1747,6 +1770,7 @@ async function renderCari() {
             <button class="btn btn-amber btn-sm" data-hak="${c.id}">+ Hakediş</button>
             <button class="btn btn-green btn-sm" data-tah="${c.id}">+ Tahsilat</button>
             <button class="btn btn-outline btn-sm" data-hiz="${c.id}">+ Hizmet</button>
+            <button class="btn btn-outline btn-sm" data-son="${c.id}">🕒 Hareketler</button>
             <button class="btn btn-outline btn-sm" data-detay="${c.id}">📄 Detay</button>
             <button class="btn btn-danger btn-sm" data-del="${c.id}">🗑</button>
           </div></div></div>`;
@@ -1761,6 +1785,7 @@ async function renderCari() {
       if (!source.length) { toast("Önce proje ekleyin"); return; }
       hizmetForm(source.map((p) => ({ v: p.id, t: p.name })), null, load);
     });
+    $("cList").querySelectorAll("[data-son]").forEach((b) => b.onclick = () => { const c = custs.find((x) => x.id === b.dataset.son); showSonlarMusteri(b.dataset.son, c ? c.name : ""); });
     $("cList").querySelectorAll("[data-detay]").forEach((b) => b.onclick = () => showDetay("musteri", b.dataset.detay, "cari"));
     $("cList").querySelectorAll("[data-del]").forEach((b) => b.onclick = () => del("customers", b.dataset.del, load));
   };
