@@ -3,6 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#1C1B19">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" type="image/png" href="icon-192.png">
 <title>Soylu İnşaat — Muhasebe V5</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
@@ -10,6 +14,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+<script src="font-tr.js"></script> <!-- PDF'lerde Türkçe karakter için gömülü font; dosya yoksa PDF varsayılan fontla (bozuk Türkçe) çalışmaya devam eder -->
 <style>
 :root{
   --bg:#1C1B19; --bg2:#242220; --card:#2A2723; --card2:#332F29;
@@ -228,7 +233,7 @@ table.tbl tr:last-child td{border-bottom:none;}
    URL hazır girildi; sadece Publishable key'inizi yazın.
    ===================================================== */
 const SUPABASE_URL = "https://yvbbojujrouiscasgfpl.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_ecNHncTWwCmL8AhGp16V4w_XA6lWPOT";   // sb_publishable_... ile başlayan anahtar
+const SUPABASE_ANON_KEY = "BURAYA_PUBLISHABLE_KEY";   // sb_publishable_... ile başlayan anahtar
 /* ===================================================== */
 
 const CFG_OK = SUPABASE_URL.startsWith("https://") && SUPABASE_ANON_KEY.length > 30;
@@ -252,6 +257,11 @@ const today = () => localKey(new Date());
 const mkey = (d) => String(d).slice(0, 7);
 const esc = (s) => (s == null ? "" : String(s)).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 function toast(m) { const t = $("toast"); t.textContent = m; t.classList.add("show"); clearTimeout(toast._h); toast._h = setTimeout(() => t.classList.remove("show"), 2600); }
+function stripHtml(h) { const d = document.createElement("div"); d.innerHTML = h == null ? "" : String(h); return (d.textContent || "").replace(/\s+/g, " ").trim(); }
+async function shareOut(txt) {
+  if (navigator.share) { try { await navigator.share({ text: txt }); } catch (e) {} }
+  else { try { await navigator.clipboard.writeText(txt); toast("Panoya kopyalandı — WhatsApp'a yapıştırın"); } catch (e) { toast("Paylaşılamadı"); } }
+}
 const isAdmin = () => me?.role === "yonetici";
 const MONTHS = ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
 const mlabel = (mk) => { const [y, m] = mk.split("-"); return MONTHS[+m - 1] + " " + y; };
@@ -259,6 +269,9 @@ const mshort = (mk) => { const [y, m] = mk.split("-"); return MONTHS[+m - 1].sli
 function monthOptions(sel) { const out = []; const now = new Date(); for (let i = 0; i < 12; i++) { const d = new Date(now.getFullYear(), now.getMonth() - i, 1); const k = localKey(d).slice(0, 7); out.push(`<option value="${k}" ${k === sel ? "selected" : ""}>${mlabel(k)}</option>`); } return out.join(""); }
 function monthRange(mk) { const [y, m] = mk.split("-").map(Number); const start = `${mk}-01`; const end = localKey(new Date(y, m, 0)); return { start, end }; }
 const PAY_OPTS = [{ v: "", t: "— yöntem —" }, { v: "nakit", t: "Nakit" }, { v: "banka", t: "Banka" }, { v: "kart", t: "Kart" }];
+const STATUS_LABEL = { aktif: "Aktif", tamamlandi: "Tamamlandı", beklemede: "Beklemede" };
+const PROP_LABEL = { arsa: "Arsa", daire: "Daire", dukkan: "Dükkan", arazi: "Arazi", diger: "Diğer", portfoyde: "Portföyde", satildi: "Satıldı", kiralandi: "Kiralandı" };
+const CT_LABEL = { kat_karsiligi: "Kat Karşılığı", takas: "Takas", satis: "Satış", kiralik: "Kiralık" };
 const payField = { key: "payment_method", label: "Ödeme Yöntemi", type: "select", options: PAY_OPTS };
 const frLabel = (f) => { f = +f; return f === 1 ? "tam" : (f === 0.5 ? "yarım" : (f === 1.5 ? "1,5" : String(f).replace(".", ","))); };
 const FR_OPTS = [{ v: "1", t: "Tam" }, { v: "0.5", t: "Yarım" }, { v: "1.5", t: "Mesaili (1,5)" }];
@@ -293,6 +306,7 @@ function openForm(title, fields, initial, onSave, extraBtn) {
     return `<div class="fld"><label>${esc(f.label)}</label><input id="ff_${f.key}" type="${f.type || "text"}" value="${esc(v)}"></div>`;
   }).join("") + `<div class="actions"><button class="btn btn-outline" id="ffCancel">Vazgeç</button>${extraBtn || ""}<button class="btn btn-amber" id="ffSave">Kaydet</button></div>`;
   $("modalOverlay").classList.add("open");
+  box.querySelectorAll("input").forEach((inp) => inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("ffSave").click(); } }));
   $("ffCancel").onclick = closeModal;
   $("ffSave").onclick = async () => {
     const vals = {};
@@ -490,14 +504,22 @@ $("fabBtn").onclick = () => {
 
 /* ---------- veri çekiciler ---------- */
 async function q(table, opts = {}) {
-  let query = sb.from(table).select(opts.select || "*");
-  if (opts.order) query = query.order(opts.order, { ascending: opts.asc ?? false });
-  if (opts.eq) for (const [k, v] of Object.entries(opts.eq)) query = query.eq(k, v);
-  if (opts.gte) for (const [k, v] of Object.entries(opts.gte)) query = query.gte(k, v);
-  if (opts.lte) for (const [k, v] of Object.entries(opts.lte)) query = query.lte(k, v);
-  const { data, error } = await query;
-  if (error) { toast("Veri hatası: " + error.message); return []; }
-  return data || [];
+  // Supabase tek istekte en fazla 1000 satır döndürür; sayfalamadan büyük tablolar SESSİZCE eksik toplanır.
+  const PAGE = 1000;
+  let all = [];
+  for (let from = 0; ; from += PAGE) {
+    let query = sb.from(table).select(opts.select || "*");
+    if (opts.order) query = query.order(opts.order, { ascending: opts.asc ?? false });
+    query = query.order("id", { ascending: true }); // sayfalar arası kararlı sıra (aynı tarihli kayıtlar kaymasın)
+    if (opts.eq) for (const [k, v] of Object.entries(opts.eq)) query = query.eq(k, v);
+    if (opts.gte) for (const [k, v] of Object.entries(opts.gte)) query = query.gte(k, v);
+    if (opts.lte) for (const [k, v] of Object.entries(opts.lte)) query = query.lte(k, v);
+    const { data, error } = await query.range(from, from + PAGE - 1);
+    if (error) { toast("Veri hatası: " + error.message); return all; }
+    all = all.concat(data || []);
+    if (!data || data.length < PAGE) break;
+  }
+  return all;
 }
 async function ins(table, row) {
   row.company_id = myCompany.id;
@@ -538,15 +560,15 @@ function workerNet(w, attRows, advRows, payRows, mode = "month") {
 async function renderPanel() {
   const el = $("page-panel");
   el.innerHTML = `<div class="page-head"><h2>Panel</h2><span class="userbadge"><b>${esc(me.full_name)}</b> · ${me.role === "yonetici" ? "Yönetici" : "Personel"}</span></div><div class="empty">Yükleniyor…</div>`;
-  const [workers, att, adv, pay, cari, sup, exp, tlog] = await Promise.all([
-    q("workers"), q("attendance"), q("advances"), q("payments"), q("cari_tx"), q("supplier_tx"), q("expenses"), q("telegram_log", { order: "created_at" }),
+  const [workers, att, adv, pay, cari, sup, exp, hiz, tlog] = await Promise.all([
+    q("workers"), q("attendance"), q("advances"), q("payments"), q("cari_tx"), q("supplier_tx"), q("expenses"), q("services"), q("telegram_log", { order: "created_at" }),
   ]);
   const mk = mkey(today());
   const inMonth = (d) => mkey(d) === mk;
 
   // genel bakiyeler (tüm zamanlar)
   const isciBorc = workers.reduce((s,w) => s + workerNet(w, att, adv, pay, "all").net, 0);
-  const musteriAlacak = cari.filter(c=>c.direction==="hakedis").reduce((s,a)=>s + +a.amount,0) - cari.filter(c=>c.direction==="tahsilat").reduce((s,a)=>s + +a.amount,0);
+  const musteriAlacak = cari.filter(c=>c.direction==="hakedis").reduce((s,a)=>s + +a.amount,0) + hiz.reduce((s,h)=>s + +h.price,0) - cari.filter(c=>c.direction==="tahsilat").reduce((s,a)=>s + +a.amount,0);
   const malzemeciBorc = sup.filter(x=>x.direction==="borc").reduce((s,a)=>s + +a.amount,0) - sup.filter(x=>x.direction==="odeme").reduce((s,a)=>s + +a.amount,0);
   const bekleyenFis = sup.filter(x=>x.price_pending).length;
 
@@ -578,7 +600,7 @@ async function renderPanel() {
   const eksik = workers.filter(w=>w.active && w.wage_type!=="maasli" && !dunlu.has(w.id)).map(w=>w.name);
 
   el.innerHTML = `
-    <div class="page-head"><h2>Panel — ${mlabel(mk)}</h2><span class="userbadge"><b>${esc(me.full_name)}</b> · ${me.role === "yonetici" ? "Yönetici" : "Personel"}</span></div>
+    <div class="page-head"><h2>Panel — ${mlabel(mk)}</h2><span><button class="btn btn-outline btn-sm" id="panelShare">📤 Özet</button> <span class="userbadge"><b>${esc(me.full_name)}</b> · ${me.role === "yonetici" ? "Yönetici" : "Personel"}</span></span></div>
     <div class="grid c4">
       <div class="stat"><div class="lbl">İşçilere Borç (net)</div><div class="val v-steel">${fmtS(isciBorc)}</div></div>
       <div class="stat"><div class="lbl">Müşteriden Alacak</div><div class="val v-amber">${fmtS(musteriAlacak)}</div></div>
@@ -598,6 +620,7 @@ async function renderPanel() {
     <div class="panel"><h3>Telegram'dan Son Gelenler</h3>
       ${tlog.slice(0,8).map(l=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12.5px;"><span style="color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(l.message)}</span><span class="pill">${dstr(l.created_at)}</span></div>`).join("") || '<div class="empty">Telegram henüz kayıt göndermedi.</div>'}
     </div>`;
+  $("panelShare").onclick = () => shareOut(`${myCompany.name} — ${dstr(today())}\nİşçilere borç: ${fmtS(isciBorc)}\nMüşteriden alacak: ${fmtS(musteriAlacak)}\nMalzemeciye borç: ${fmtS(malzemeciBorc)}\nBu ay hakediş: ${fmt(ayHakedis)}`);
 }
 
 /* ---------- PUANTAJ (günlük + geçmiş takvimi) ---------- */
@@ -733,41 +756,60 @@ function showDetay(type, id, backTo) {
   nav("detay");
 }
 
-const DETAY_KIND_LABEL = { isci: "İşçi", musteri: "Müşteri", malzemeci: "Malzemeci", taseron: "Taşeron" };
+const DETAY_KIND_LABEL = { isci: "İşçi", musteri: "Müşteri", malzemeci: "Malzemeci", taseron: "Taşeron", proje: "Proje" };
 
 async function renderDetay() {
   const el = $("page-detay");
   el.innerHTML = `<div class="page-head"><h2>Detay</h2></div><div class="empty">Yükleniyor…</div>`;
   const st = detayState;
   if (!st) { el.innerHTML = '<div class="empty">Kayıt seçilmedi. Lütfen bir liste sayfasından "Detay" ile açın.</div>'; return; }
-  const loaders = { isci: detayIsci, musteri: detayMusteri, malzemeci: detayMalzemeci, taseron: detayTaseron };
+  const loaders = { isci: detayIsci, musteri: detayMusteri, malzemeci: detayMalzemeci, taseron: detayTaseron, proje: detayProje };
   const data = await loaders[st.type](st.id);
   if (!data) { el.innerHTML = `<div class="page-head"><button class="btn btn-outline btn-sm" id="detayBack">← Geri</button></div><div class="empty">Kayıt bulunamadı (silinmiş olabilir).</div>`;
     $("detayBack").onclick = () => nav(st.backTo || "panel"); return; }
 
-  const rowsHtml = data.rows.map((r) => `<tr>
+  // r.extra: sadece EKRANDA gösterilen ek bilgi (örn. hizmet kâr pill'i) — Excel/PDF çıktısına girmez
+  const rowHtml = (r, showBak) => `<tr>
       <td>${dstr(r.tarih)}</td>
       <td><span class="pill">${esc(r.tur)}</span></td>
-      <td>${r.aciklama}</td>
+      <td>${r.aciklama}${r.extra || ""}</td>
       <td class="mono ${r.tutar >= 0 ? "v-green" : "v-red"}">${fmtS(r.tutar)}</td>
-      <td class="mono ${r.bakClass}">${fmtS(r.bakiye)}</td>
-      <td class="rowact"><button class="btn btn-outline btn-sm" data-dedit="${r.key}">✎</button><button class="btn btn-danger btn-sm" data-ddel="${r.key}">🗑</button></td>
-    </tr>`).join("");
+      ${showBak ? `<td class="mono ${r.bakClass}">${r.bakiye == null ? "—" : fmtS(r.bakiye)}</td>` : ""}
+      <td class="rowact">${(r.editFn || r.delFn) ? `${r.editFn ? `<button class="btn btn-outline btn-sm" data-dedit="${r.key}">✎</button>` : ""}${r.delFn ? `<button class="btn btn-danger btn-sm" data-ddel="${r.key}">🗑</button>` : ""}` : ""}</td>
+    </tr>`;
+  const mainRows = data.rows.filter((r) => !r.section);
+  const hakRows = data.rows.filter((r) => r.section === "hakedis");
 
   el.innerHTML = `
     <div class="page-head">
       <h2>${DETAY_KIND_LABEL[st.type]} — ${esc(data.title)}</h2>
-      <button class="btn btn-outline btn-sm" id="detayBack">← Geri</button>
+      <span>
+        <button class="btn btn-outline btn-sm" id="detayShare">📤 Paylaş</button>
+        <button class="btn btn-amber btn-sm" id="detayXls">📊 Excel</button>
+        <button class="btn btn-outline btn-sm" id="detayPdf">📄 PDF</button>
+        <button class="btn btn-outline btn-sm" id="detayBack">← Geri</button>
+      </span>
     </div>
     ${data.statsHtml || ""}
-    <div class="panel"><h3>Tüm Hareketler (${data.rows.length})</h3>
+    <div class="panel"><h3>Tüm Hareketler (${mainRows.length})</h3>
       <div class="tblwrap"><table class="tbl">
         <tr><th>Tarih</th><th>Tür</th><th>Açıklama</th><th>Tutar</th><th>Bakiye</th><th></th></tr>
-        ${rowsHtml || `<tr><td colspan="6" class="empty">Henüz kayıt yok</td></tr>`}
+        ${mainRows.map((r) => rowHtml(r, true)).join("") || `<tr><td colspan="6" class="empty">Henüz kayıt yok</td></tr>`}
       </table></div>
-    </div>`;
+    </div>
+    ${hakRows.length ? `<div class="panel"><h3>Hakediş / Fatura Kayıtları (${hakRows.length})</h3>
+      <div style="font-size:11.5px;color:var(--dim);margin-bottom:8px;">Bu kayıtlar fatura merceğidir; yukarıdaki koşan bakiyeye dahil değildir.</div>
+      <div class="tblwrap"><table class="tbl">
+        <tr><th>Tarih</th><th>Tür</th><th>Açıklama</th><th>Tutar</th><th></th></tr>
+        ${hakRows.map((r) => rowHtml(r, false)).join("")}
+      </table></div>
+    </div>` : ""}`;
 
   $("detayBack").onclick = () => nav(st.backTo || "panel");
+  $("detayShare").onclick = () => shareOut(data.shareText || (DETAY_KIND_LABEL[st.type] + " — " + data.title));
+  const expRows = () => data.rows.map((r) => ({ Tarih: dstr(r.tarih), Tur: r.tur, Aciklama: stripHtml(r.aciklama), Tutar: r.tutar, Bakiye: r.bakiye == null ? "" : r.bakiye }));
+  $("detayXls").onclick = () => dlXlsx(expRows(), `detay-${data.title}.xlsx`, "Detay");
+  $("detayPdf").onclick = () => dlPdf(expRows(), `detay-${data.title}.pdf`, `${DETAY_KIND_LABEL[st.type]} Detay — ${data.title}`);
   const byKey = {}; data.rows.forEach((r) => byKey[r.key] = r);
   el.querySelectorAll("[data-dedit]").forEach((b) => b.onclick = () => byKey[b.dataset.dedit].editFn(() => renderDetay()));
   el.querySelectorAll("[data-ddel]").forEach((b) => b.onclick = () => byKey[b.dataset.ddel].delFn(() => renderDetay()));
@@ -811,18 +853,20 @@ async function detayIsci(workerId) {
   entries.forEach((e) => { bal += e.tutar; e.bakiye = bal; e.bakClass = bal > 0 ? "v-steel" : "v-green"; });
 
   const { net } = workerNet(w, att, adv, pay, "all");
+  const advT = adv.reduce((s, x) => s + +x.amount, 0), payT = pay.reduce((s, x) => s + +x.amount, 0);
   const statsHtml = `<div class="grid c4" style="margin-bottom:14px;">
     <div class="stat"><div class="lbl">Ücret</div><div class="val">${w.wage_type === "maasli" ? fmt(w.monthly_salary) + "/ay" : fmt(w.daily_wage) + "/gün"}</div></div>
-    <div class="stat"><div class="lbl">Toplam Avans</div><div class="val v-steel">${fmt(adv.reduce((s, x) => s + +x.amount, 0))}</div></div>
-    <div class="stat"><div class="lbl">Toplam Ödeme</div><div class="val v-green">${fmt(pay.reduce((s, x) => s + +x.amount, 0))}</div></div>
+    <div class="stat"><div class="lbl">Toplam Avans</div><div class="val v-steel">${fmt(advT)}</div></div>
+    <div class="stat"><div class="lbl">Toplam Ödeme</div><div class="val v-green">${fmt(payT)}</div></div>
     <div class="stat"><div class="lbl">Net (Tüm Zamanlar)</div><div class="val ${net > 0 ? "v-steel" : "v-green"}">${fmtS(net)}</div></div>
   </div>`;
-  return { title: w.name, statsHtml, rows: entries };
+  const shareText = `${w.name} — Net: ${fmtS(net)} (Avans ${fmt(advT)}, Ödeme ${fmt(payT)}) · ${dstr(today())}`;
+  return { title: w.name, statsHtml, rows: entries, shareText };
 }
 
 /* --- Loader: Müşteri (cari_tx: hakediş +, tahsilat −) --- */
 async function detayMusteri(customerId) {
-  const [c, projs, txs, att, exp, subtx, suptx] = await Promise.all([
+  const [c, projs, txs, att, exp, subtx, suptx, hiz] = await Promise.all([
     q("customers", { eq: { id: customerId } }).then((r) => r[0]),
     q("projects"),
     q("cari_tx", { eq: { customer_id: customerId } }),
@@ -830,32 +874,82 @@ async function detayMusteri(customerId) {
     q("expenses"),
     q("sub_tx"),
     q("supplier_tx"),
+    q("services"),
   ]);
   if (!c) return null;
   const pn = {}; projs.forEach((p) => pn[p.id] = p.name);
-  const entries = txs.map((t) => ({
-    key: "cari_" + t.id, tarih: t.tx_date, tur: t.direction === "hakedis" ? "hakediş" : "tahsilat",
-    aciklama: esc(t.note || "") + (t.project_id ? ' <span class="pill">' + esc(pn[t.project_id] || "") + "</span>" : "") + (t.payment_method ? ' <span class="pill">' + esc(t.payment_method) + "</span>" : ""),
-    tutar: t.direction === "hakedis" ? +t.amount : -(+t.amount),
+  const [workers, subs, sups] = await Promise.all([q("workers"), q("subcontractors"), q("suppliers")]);
+  const wn = {}; workers.forEach((w) => wn[w.id] = w.name);
+  const sn = {}; subs.forEach((s) => sn[s.id] = s.name);
+  const spn = {}; sups.forEach((s) => spn[s.id] = s.name);
+
+  const myProjects = projs.filter((p) => p.customer_id === customerId || (p.customer && p.customer.toLowerCase().trim() === c.name.toLowerCase().trim()));
+  const myProjIds = new Set(myProjects.map((p) => p.id));
+  const projPill = (pid) => ' <span class="pill">' + esc(pn[pid] || "?") + "</span>";
+
+  // Ana döküm: tüm projelerin maliyeti (borç) + tahsilat (alacak) — rapordaki Müşteri Cari Dökümü ile aynı, koşan bakiyeli
+  const entries = [];
+  att.filter((a) => myProjIds.has(a.project_id) && +a.wage_amount > 0).forEach((a) => entries.push({
+    key: "att_" + a.id, tarih: a.work_date, tur: "işçilik",
+    aciklama: "İşçilik: " + esc(wn[a.worker_id] || "?") + " (" + esc(frLabel(a.fraction || 1)) + " gün)" + projPill(a.project_id),
+    tutar: -(+a.wage_amount || 0),
+  }));
+  exp.filter((e) => myProjIds.has(e.project_id)).forEach((e) => entries.push({
+    key: "exp_" + e.id, tarih: e.tx_date, tur: "gider",
+    aciklama: "Gider: " + esc(e.category || "") + (e.note ? " — " + esc(e.note) : "") + projPill(e.project_id),
+    tutar: -(+e.amount || 0),
+  }));
+  subtx.filter((t) => myProjIds.has(t.project_id) && t.direction === "hakedis").forEach((t) => entries.push({
+    key: "sub_" + t.id, tarih: t.tx_date, tur: "taşeron",
+    aciklama: "Taşeron: " + esc(sn[t.sub_id] || "?") + (t.note ? " — " + esc(t.note) : "") + projPill(t.project_id),
+    tutar: -(+t.amount || 0),
+  }));
+  suptx.filter((t) => myProjIds.has(t.project_id) && t.direction === "borc").forEach((t) => entries.push({
+    key: "sup_" + t.id, tarih: t.tx_date, tur: "malzeme",
+    aciklama: "Malzeme: " + esc(spn[t.supplier_id] || "?") + (t.note ? " — " + esc(t.note) : "") + projPill(t.project_id),
+    tutar: -(+t.amount || 0),
+  }));
+  // Hizmet: müşteri fiyatıyla borçlandırma; maliyet/kâr SADECE ekranda (extra) — Excel/PDF'e sızmaz
+  hiz.filter((h) => myProjIds.has(h.project_id)).forEach((h) => entries.push({
+    key: "hiz_" + h.id, tarih: h.tx_date, tur: "hizmet",
+    aciklama: "Hizmet: " + esc(h.title || "") + (h.note ? " — " + esc(h.note) : "") + projPill(h.project_id),
+    extra: +h.cost ? ' <span class="pill">maliyet ' + fmt(h.cost) + ' · kâr ' + fmtS(+h.price - +h.cost) + "</span>" : "",
+    tutar: -(+h.price || 0),
+    editFn: (cb) => hizmetForm(projs.map((p) => ({ v: p.id, t: p.name })), h, cb),
+    delFn: (cb) => del("services", h.id, cb),
+  }));
+  txs.filter((t) => t.direction === "tahsilat").forEach((t) => entries.push({
+    key: "cari_" + t.id, tarih: t.tx_date, tur: "tahsilat",
+    aciklama: "Tahsilat" + (t.payment_method ? ' <span class="pill">' + esc(t.payment_method) + "</span>" : "") + (t.note ? " — " + esc(t.note) : "") + (t.project_id ? projPill(t.project_id) : ""),
+    tutar: +t.amount || 0,
     editFn: (cb) => editCariTx(t, cb),
     delFn: (cb) => del("cari_tx", t.id, cb),
   }));
   entries.sort((a, b) => a.tarih.localeCompare(b.tarih));
   let bal = 0;
-  entries.forEach((e) => { bal += e.tutar; e.bakiye = bal; e.bakClass = bal > 0 ? "v-amber" : "v-green"; });
+  entries.forEach((e) => { bal += e.tutar; e.bakiye = bal; e.bakClass = bal >= 0 ? "v-green" : "v-red"; });
 
-  const myProjects = projs.filter((p) => p.customer_id === customerId || (p.customer && p.customer.toLowerCase().trim() === c.name.toLowerCase().trim()));
+  // Hakediş (fatura) kayıtları — koşan bakiyeye karışmaz, Detay'da ayrı bölümde gösterilir
+  txs.filter((t) => t.direction === "hakedis").sort((a, b) => a.tx_date.localeCompare(b.tx_date)).forEach((t) => entries.push({
+    key: "hak_" + t.id, tarih: t.tx_date, tur: "hakediş", section: "hakedis",
+    aciklama: "Hakediş/Fatura" + (t.note ? " — " + esc(t.note) : "") + (t.project_id ? projPill(t.project_id) : ""),
+    tutar: +t.amount || 0, bakiye: null, bakClass: "",
+    editFn: (cb) => editCariTx(t, cb),
+    delFn: (cb) => del("cari_tx", t.id, cb),
+  }));
   
-  let totalCost = 0;
+  let totalCost = 0, totalHizP = 0, totalHizC = 0;
   const projectsHtml = myProjects.map((p) => {
     const pIsc = att.filter((a) => a.project_id === p.id).reduce((s, a) => s + +a.wage_amount, 0);
     const pGid = exp.filter((a) => a.project_id === p.id).reduce((s, a) => s + +a.amount, 0);
     const pTas = subtx.filter((a) => a.project_id === p.id && a.direction === "hakedis").reduce((s, a) => s + +a.amount, 0);
     const pMal = suptx.filter((a) => a.project_id === p.id && a.direction === "borc").reduce((s, a) => s + +a.amount, 0);
-    const pMaliyet = pIsc + pGid + pTas + pMal;
-    totalCost += pMaliyet;
+    const pHizP = hiz.filter((h) => h.project_id === p.id).reduce((s, h) => s + +h.price, 0);
+    const pHizC = hiz.filter((h) => h.project_id === p.id).reduce((s, h) => s + +h.cost, 0);
+    const pMaliyet = pIsc + pGid + pTas + pMal + pHizC;
+    totalCost += pMaliyet; totalHizP += pHizP; totalHizC += pHizC;
 
-    const pGelir = txs.filter((t) => t.project_id === p.id && t.direction === "hakedis").reduce((s, t) => s + +t.amount, 0);
+    const pGelir = txs.filter((t) => t.project_id === p.id && t.direction === "hakedis").reduce((s, t) => s + +t.amount, 0) + pHizP;
     const pNet = pGelir - pMaliyet;
 
     return `<tr>
@@ -864,24 +958,25 @@ async function detayMusteri(customerId) {
       <td class="mono v-green">${fmt(pGelir)}</td>
       <td class="mono v-red">${fmt(pMaliyet)}</td>
       <td class="mono ${pNet >= 0 ? "v-green" : "v-red"}"><b>${fmtS(pNet)}</b></td>
-      <td><span class="pill">${esc(p.status)}</span></td>
+      <td><span class="pill">${esc(STATUS_LABEL[p.status] || p.status)}</span></td>
     </tr>`;
   }).join("") || `<tr><td colspan="6" class="empty">Bu müşteriye bağlı proje yok</td></tr>`;
 
-  const hak = txs.filter((t) => t.direction === "hakedis").reduce((s, t) => s + +t.amount, 0);
+  const hak = txs.filter((t) => t.direction === "hakedis").reduce((s, t) => s + +t.amount, 0) + totalHizP;
   const tah = txs.filter((t) => t.direction === "tahsilat").reduce((s, t) => s + +t.amount, 0);
   const faturaKalan = hak - tah;
-  const maliyetKalan = totalCost - tah;
+  const maliyetKalan = (totalCost - totalHizC + totalHizP) - tah; // borç merceği: maliyetler + hizmet fiyatı
 
   const statsHtml = `
     <div class="grid c4" style="margin-bottom:14px;">
-      <div class="stat"><div class="lbl">Hakediş (Fatura)</div><div class="val v-amber">${fmt(hak)}</div></div>
+      <div class="stat"><div class="lbl">Hakediş${totalHizP ? "+Hizmet" : ""} (Fatura)</div><div class="val v-amber">${fmt(hak)}</div></div>
       <div class="stat"><div class="lbl">Tahsilat</div><div class="val v-green">${fmt(tah)}</div></div>
       <div class="stat"><div class="lbl">Fatura Kalan</div><div class="val ${faturaKalan > 0 ? "v-amber" : "v-green"}">${fmtS(faturaKalan)}</div></div>
       <div class="stat"><div class="lbl">Maliyet (Harcama)</div><div class="val v-red">${fmt(totalCost)}</div></div>
     </div>
-    <div class="grid c2" style="margin-bottom:14px;">
+    <div class="grid c4" style="margin-bottom:14px;">
       <div class="stat"><div class="lbl">Harcama Kalan</div><div class="val ${maliyetKalan > 0 ? "v-red" : "v-green"}">${fmtS(maliyetKalan)}</div></div>
+      <div class="stat"><div class="lbl">Hizmet Kârı</div><div class="val ${totalHizP - totalHizC >= 0 ? "v-green" : "v-red"}">${fmtS(totalHizP - totalHizC)}</div></div>
       <div class="stat"><div class="lbl">Telefon</div><div class="val" style="font-size:14px;">${esc(c.phone || "—")}</div></div>
     </div>
     <div class="panel" style="margin-bottom:14px;">
@@ -892,7 +987,8 @@ async function detayMusteri(customerId) {
       </table></div>
     </div>`;
 
-  return { title: c.name, statsHtml, rows: entries };
+  const shareText = `${c.name} — Hakediş: ${fmt(hak)}, Tahsilat: ${fmt(tah)}, Fatura Kalan: ${fmtS(faturaKalan)} · ${dstr(today())}`;
+  return { title: c.name, statsHtml, rows: entries, shareText };
 }
 
 /* --- Loader: Malzemeci (supplier_tx: borç(alım) +, ödeme −) --- */
@@ -926,7 +1022,8 @@ async function detayMalzemeci(supplierId) {
     <div class="stat"><div class="lbl">Kalan Borcumuz</div><div class="val ${borc - ode > 0 ? "v-red" : "v-green"}">${fmtS(borc - ode)}</div></div>
     <div class="stat"><div class="lbl">Telefon</div><div class="val" style="font-size:14px;">${esc(sp.phone || "—")}</div></div>
   </div>`;
-  return { title: sp.name, statsHtml, rows: entries };
+  const shareText = `${sp.name} — Alım: ${fmt(borc)}, Ödenen: ${fmt(ode)}, Kalan borcumuz: ${fmtS(borc - ode)} · ${dstr(today())}`;
+  return { title: sp.name, statsHtml, rows: entries, shareText };
 }
 
 /* --- Loader: Taşeron (sub_tx: hakediş +, ödeme −) — önceden tekil satır hiç render edilmiyordu --- */
@@ -957,7 +1054,93 @@ async function detayTaseron(subId) {
     <div class="stat"><div class="lbl">Kalan Borcumuz</div><div class="val v-steel">${fmtS(hak - ode)}</div></div>
     <div class="stat"><div class="lbl">İş Kalemi</div><div class="val" style="font-size:14px;">${esc(sc.job || "—")}</div></div>
   </div>`;
-  return { title: sc.name, statsHtml, rows: entries };
+  const shareText = `${sc.name} — Hakediş: ${fmt(hak)}, Ödenen: ${fmt(ode)}, Kalan borcumuz: ${fmtS(hak - ode)} · ${dstr(today())}`;
+  return { title: sc.name, statsHtml, rows: entries, shareText };
+}
+
+/* --- Loader: Proje (işçilik+gider+taşeron+malzeme borç, tahsilat alacak; koşan bakiye) --- */
+async function detayProje(projectId) {
+  const [p, att, exp, subtx, suptx, cari, hiz, workers, subs, sups, custs] = await Promise.all([
+    q("projects", { eq: { id: projectId } }).then((r) => r[0]),
+    q("attendance", { eq: { project_id: projectId } }),
+    q("expenses", { eq: { project_id: projectId } }),
+    q("sub_tx", { eq: { project_id: projectId } }),
+    q("supplier_tx", { eq: { project_id: projectId } }),
+    q("cari_tx", { eq: { project_id: projectId } }),
+    q("services", { eq: { project_id: projectId } }),
+    q("workers"), q("subcontractors"), q("suppliers"), q("customers"),
+  ]);
+  if (!p) return null;
+  const wn = {}; workers.forEach((w) => wn[w.id] = w.name);
+  const sn = {}; subs.forEach((s) => sn[s.id] = s.name);
+  const spn = {}; sups.forEach((s) => spn[s.id] = s.name);
+  const cn = {}; custs.forEach((c) => cn[c.id] = c.name);
+  const entries = [];
+  att.filter((a) => +a.wage_amount > 0).forEach((a) => entries.push({
+    key: "att_" + a.id, tarih: a.work_date, tur: "işçilik",
+    aciklama: "İşçilik: " + esc(wn[a.worker_id] || "?") + " (" + esc(frLabel(a.fraction || 1)) + " gün)",
+    tutar: -(+a.wage_amount || 0),
+  }));
+  exp.forEach((e) => entries.push({
+    key: "exp_" + e.id, tarih: e.tx_date, tur: "gider",
+    aciklama: "Gider: " + esc(e.category || "") + (e.note ? " — " + esc(e.note) : ""),
+    tutar: -(+e.amount || 0),
+  }));
+  subtx.filter((t) => t.direction === "hakedis").forEach((t) => entries.push({
+    key: "sub_" + t.id, tarih: t.tx_date, tur: "taşeron",
+    aciklama: "Taşeron: " + esc(sn[t.sub_id] || "?") + (t.note ? " — " + esc(t.note) : ""),
+    tutar: -(+t.amount || 0),
+  }));
+  suptx.filter((t) => t.direction === "borc").forEach((t) => entries.push({
+    key: "sup_" + t.id, tarih: t.tx_date, tur: "malzeme",
+    aciklama: "Malzeme: " + esc(spn[t.supplier_id] || "?") + (t.note ? " — " + esc(t.note) : ""),
+    tutar: -(+t.amount || 0),
+  }));
+  // Hizmet: müşteri fiyatıyla borçlandırma; maliyet/kâr SADECE ekranda (extra) — Excel/PDF'e sızmaz
+  hiz.forEach((h) => entries.push({
+    key: "hiz_" + h.id, tarih: h.tx_date, tur: "hizmet",
+    aciklama: "Hizmet: " + esc(h.title || "") + (h.note ? " — " + esc(h.note) : ""),
+    extra: +h.cost ? ' <span class="pill">maliyet ' + fmt(h.cost) + ' · kâr ' + fmtS(+h.price - +h.cost) + "</span>" : "",
+    tutar: -(+h.price || 0),
+    editFn: (cb) => hizmetForm([{ v: p.id, t: p.name }], h, cb),
+    delFn: (cb) => del("services", h.id, cb),
+  }));
+  cari.filter((t) => t.direction === "tahsilat").forEach((t) => entries.push({
+    key: "cari_" + t.id, tarih: t.tx_date, tur: "tahsilat",
+    aciklama: "Tahsilat" + (t.payment_method ? ' <span class="pill">' + esc(t.payment_method) + "</span>" : "") + (t.note ? " — " + esc(t.note) : ""),
+    tutar: +t.amount || 0,
+    editFn: (cb) => editCariTx(t, cb),
+    delFn: (cb) => del("cari_tx", t.id, cb),
+  }));
+  entries.sort((a, b) => a.tarih.localeCompare(b.tarih));
+  let bal = 0;
+  entries.forEach((e) => { bal += e.tutar; e.bakiye = bal; e.bakClass = bal >= 0 ? "v-green" : "v-red"; });
+
+  const isc = att.reduce((s, a) => s + +a.wage_amount, 0);
+  const gid = exp.reduce((s, e) => s + +e.amount, 0);
+  const tas = subtx.filter((t) => t.direction === "hakedis").reduce((s, t) => s + +t.amount, 0);
+  const mal = suptx.filter((t) => t.direction === "borc").reduce((s, t) => s + +t.amount, 0);
+  const hizP = hiz.reduce((s, h) => s + +h.price, 0);
+  const hizC = hiz.reduce((s, h) => s + +h.cost, 0);
+  const gelir = cari.filter((t) => t.direction === "hakedis").reduce((s, t) => s + +t.amount, 0) + hizP;
+  const tahsilat = cari.filter((t) => t.direction === "tahsilat").reduce((s, t) => s + +t.amount, 0);
+  const maliyet = isc + gid + tas + mal + hizC;
+  const net = gelir - maliyet;
+  const custDisp = cn[p.customer_id] || p.customer || "Müşteri yok";
+  const statsHtml = `<div class="grid c4" style="margin-bottom:14px;">
+    <div class="stat"><div class="lbl">Müşteri</div><div class="val" style="font-size:14px;">${esc(custDisp)}</div></div>
+    <div class="stat"><div class="lbl">Sözleşme</div><div class="val">${p.contract_amount ? fmt(p.contract_amount) : "—"}</div></div>
+    <div class="stat"><div class="lbl">Gelir (Hakediş${hizP ? "+Hizmet" : ""})</div><div class="val v-green">${fmt(gelir)}</div></div>
+    <div class="stat"><div class="lbl">Tahmini Kâr/Zarar</div><div class="val ${net >= 0 ? "v-green" : "v-red"}">${fmtS(net)}</div></div>
+  </div>
+  <div class="grid c4" style="margin-bottom:14px;">
+    <div class="stat"><div class="lbl">İşçilik</div><div class="val v-steel">${fmt(isc)}</div></div>
+    <div class="stat"><div class="lbl">Gider</div><div class="val v-red">${fmt(gid)}</div></div>
+    <div class="stat"><div class="lbl">Taşeron+Malz.${hizC ? "+Hizmet" : ""}</div><div class="val v-red">${fmt(tas + mal + hizC)}</div></div>
+    <div class="stat"><div class="lbl">Tahsilat</div><div class="val v-green">${fmt(tahsilat)}</div></div>
+  </div>`;
+  const shareText = `${p.name} — Gelir: ${fmt(gelir)}, Maliyet: ${fmt(maliyet)}, Tahmini Kâr/Zarar: ${fmtS(net)}, Tahsilat: ${fmt(tahsilat)} · ${dstr(today())}`;
+  return { title: p.name, statsHtml, rows: entries, shareText };
 }
 
 /* --- Edit: Avans / Ödeme (işçi cari) --- */
@@ -1045,11 +1228,34 @@ async function odeForm(sid, existing, cb) {
   });
 }
 
+/* --- Hizmet / İş Kalemi: price = müşteriye fiyat (borçlandırma), cost = bize maliyet (müşteri çıktılarında ASLA görünmez).
+       Maliyeti buraya yazınca aynı tutar ayrıca Gider olarak GİRİLMEZ (çift sayım olur). --- */
+async function hizmetForm(projOpts, existing, cb) {
+  openForm(existing ? "Hizmeti Düzenle" : "Hizmet / İş Kalemi Ekle", [
+    { key: "title", label: "Başlık (örn: Mutfak dolabı işçiliği)", required: true },
+    { key: "price", label: "Müşteri Fiyatı (TL — müşteri bu tutarı borçlanır)", type: "number", required: true },
+    { key: "cost", label: "Bana Maliyeti (TL — müşteri görmez, kâr hesabı için)", type: "number" },
+    { key: "payment_method", label: "Maliyet Ödeme Yöntemi (kasa raporu için)", type: "select", options: PAY_OPTS },
+    { key: "tx_date", label: "Tarih", type: "date", def: today() },
+    { key: "project_id", label: "Proje", type: "select", options: projOpts, required: true },
+    { key: "note", label: "Açıklama" },
+  ], existing || null, async (v) => {
+    v.cost = v.cost || 0;
+    if (existing) { await upd("services", existing.id, v); toast("Güncellendi"); }
+    else {
+      if (!(await checkDup("services", { project_id: v.project_id, tx_date: v.tx_date, price: v.price }))) return;
+      await ins("services", v); toast("Hizmet kaydedildi");
+    }
+    cb && cb();
+  });
+}
+
 /* ---------- İŞÇİLER ---------- */
 async function renderIsciler() {
   const el = $("page-isciler");
+  let hideW = true; try { hideW = localStorage.getItem("hideW") !== "0"; } catch (e) {}
   el.innerHTML = `<div class="page-head"><h2>İşçiler</h2><button class="btn btn-amber btn-sm" id="wAdd">+ Yeni İşçi</button></div>
-    <div class="searchrow"><input id="wSearch" placeholder="İsim ara…"><select id="wMonth" style="max-width:170px;"><option value="ALL">Tüm Zamanlar</option>${monthOptions(mkey(today()))}</select></div>
+    <div class="searchrow"><input id="wSearch" placeholder="İsim ara…"><select id="wMonth" style="max-width:170px;"><option value="ALL">Tüm Zamanlar</option>${monthOptions(mkey(today()))}</select><label style="align-self:center;font-size:12px;"><input type="checkbox" id="wHidePassive" ${hideW ? "checked" : ""}> Ayrılanları gizle</label></div>
     <div class="tblwrap" id="wTable"><div class="empty">Yükleniyor…</div></div>`;
   const projs = await q("projects", { order: "name", asc: true });
   const projOpts = [{ v: "", t: "Proje yok" }].concat(projs.map((p) => ({ v: p.id, t: p.name })));
@@ -1073,7 +1279,7 @@ async function renderIsciler() {
       q("payments", allMode ? {} : { gte: { tx_date: range.start }, lte: { tx_date: range.end } }),
     ]);
     const s = ($("wSearch").value || "").toLowerCase();
-    const rows = workers.filter((w) => w.name.toLowerCase().includes(s)).map((w) => {
+    const rows = workers.filter((w) => w.name.toLowerCase().includes(s) && (!$("wHidePassive").checked || w.active)).map((w) => {
       const { brut, gun, avans: a, odeme: p, net } = workerNet(w, att, adv, pay, allMode ? "all" : "month");
       return `<tr>
         <td><b>${esc(w.name)}</b>${w.active ? "" : ' <span class="pill">ayrıldı</span>'}<br><span class="pill">${esc(pName[w.project_id] || "proje yok")}</span></td>
@@ -1087,6 +1293,7 @@ async function renderIsciler() {
           <button class="btn btn-outline btn-sm" data-avans="${w.id}">Avans</button>
           <button class="btn btn-green btn-sm" data-ode="${w.id}">Ödeme</button>
           <button class="btn btn-outline btn-sm" data-detay="${w.id}">📄 Detay</button>
+          <button class="btn btn-outline btn-sm" data-toggle="${w.id}">${w.active ? "⏸ Pasif" : "▶ Aktif"}</button>
           <button class="btn btn-outline btn-sm" data-edit="${w.id}">✎</button>
           <button class="btn btn-danger btn-sm" data-del="${w.id}">🗑</button>
         </td></tr>`;
@@ -1130,9 +1337,15 @@ async function renderIsciler() {
     $("wTable").querySelectorAll("[data-avans]").forEach((b) => b.onclick = () => txForm(b.dataset.avans, "advances", wBy[b.dataset.avans].name + " — Avans"));
     $("wTable").querySelectorAll("[data-ode]").forEach((b) => b.onclick = () => txForm(b.dataset.ode, "payments", wBy[b.dataset.ode].name + " — Ödeme"));
     $("wTable").querySelectorAll("[data-detay]").forEach((b) => b.onclick = () => showDetay("isci", b.dataset.detay, "isciler"));
+    $("wTable").querySelectorAll("[data-toggle]").forEach((b) => b.onclick = async () => {
+      const w = wBy[b.dataset.toggle];
+      await upd("workers", w.id, { active: !w.active });
+      toast(w.active ? `${w.name} pasife alındı` : `${w.name} yeniden aktif`); load();
+    });
   };
   $("wAdd").onclick = () => openForm("Yeni İşçi", wFields, { active: "true", wage_type: "yevmiyeli" }, async (v) => { v.active = v.active === "true"; await ins("workers", v); toast("İşçi eklendi"); load(); });
   $("wSearch").oninput = load; $("wMonth").onchange = load;
+  $("wHidePassive").onchange = () => { try { localStorage.setItem("hideW", $("wHidePassive").checked ? "1" : "0"); } catch (e) {} load(); };
   load();
 }
 
@@ -1142,31 +1355,36 @@ async function renderCari() {
   el.innerHTML = `<div class="page-head"><h2>Cari / Müşteriler</h2><button class="btn btn-amber btn-sm" id="cAdd">+ Yeni Müşteri</button></div>
     <div class="searchrow"><input id="cSearch" placeholder="Müşteri ara…"></div><div id="cList" class="empty">Yükleniyor…</div>`;
   const load = async () => {
-    const [custs, txs, projs, att, exp, subtx, suptx] = await Promise.all([
+    const [custs, txs, projs, att, exp, subtx, suptx, hiz] = await Promise.all([
       q("customers", { order: "name", asc: true }),
       q("cari_tx", { order: "tx_date" }),
       q("projects"),
       q("attendance"),
       q("expenses"),
       q("sub_tx"),
-      q("supplier_tx")
+      q("supplier_tx"),
+      q("services")
     ]);
     const s = ($("cSearch").value || "").toLowerCase();
     $("cList").innerHTML = custs.filter((c) => c.name.toLowerCase().includes(s)).map((c) => {
       const mine = txs.filter((t) => t.customer_id === c.id);
-      const myProjects = projs.filter((p) => p.customer_id === c.id);
+      // detayMusteri ve musteriCari ile AYNI eşleştirme: FK + eski metin alanı (rakamlar ekranlar arası tutsun)
+      const myProjects = projs.filter((p) => p.customer_id === c.id || (p.customer && p.customer.toLowerCase().trim() === c.name.toLowerCase().trim()));
       const myProjIds = new Set(myProjects.map((p) => p.id));
       
       const isc = att.filter((a) => myProjIds.has(a.project_id)).reduce((s, a) => s + +a.wage_amount, 0);
       const gid = exp.filter((a) => myProjIds.has(a.project_id)).reduce((s, a) => s + +a.amount, 0);
       const tas = subtx.filter((a) => myProjIds.has(a.project_id) && a.direction === "hakedis").reduce((s, a) => s + +a.amount, 0);
       const mal = suptx.filter((a) => myProjIds.has(a.project_id) && a.direction === "borc").reduce((s, a) => s + +a.amount, 0);
-      const maliyet = isc + gid + tas + mal;
+      const myHiz = hiz.filter((h) => myProjIds.has(h.project_id));
+      const hizP = myHiz.reduce((s, h) => s + +h.price, 0); // hizmet: müşteriye fiyat (borçlandırma)
+      const hizC = myHiz.reduce((s, h) => s + +h.cost, 0);  // hizmet: bize maliyet (müşteri görmez)
+      const maliyet = isc + gid + tas + mal + hizC;
 
-      const hak = mine.filter((t) => t.direction === "hakedis").reduce((x, t) => x + +t.amount, 0);
+      const hak = mine.filter((t) => t.direction === "hakedis").reduce((x, t) => x + +t.amount, 0) + hizP;
       const tah = mine.filter((t) => t.direction === "tahsilat").reduce((x, t) => x + +t.amount, 0);
       const faturaKalan = hak - tah;
-      const maliyetKalan = maliyet - tah;
+      const maliyetKalan = (isc + gid + tas + mal + hizP) - tah; // borç merceği: maliyetler + hizmet fiyatı
 
       const projNamesDisp = myProjects.map((p) => p.name).join(", ");
       const projHtml = myProjects.length ? `<div style="font-size:11.5px;color:var(--dim);margin:3px 0 6px;"><b>Projeler:</b> ${esc(projNamesDisp)}</div>` : "";
@@ -1175,7 +1393,7 @@ async function renderCari() {
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
           <div><b>${esc(c.name)}</b> ${c.phone ? '<span class="pill">' + esc(c.phone) + "</span>" : ""}<br>
             ${projHtml}
-            <span style="font-size:12px;color:var(--dim);">Hakediş ${fmt(hak)} · Tahsilat ${fmt(tah)} · Harcanan/Maliyet ${fmt(maliyet)}</span><br>
+            <span style="font-size:12px;color:var(--dim);">Hakediş${hizP ? "+Hizmet" : ""} ${fmt(hak)} · Tahsilat ${fmt(tah)} · Harcanan/Maliyet ${fmt(maliyet)}</span><br>
             <span style="font-size:12.5px;display:inline-block;margin-top:4px;">
               <span style="margin-right:12px;">Fatura Kalan: <b class="mono ${faturaKalan > 0 ? "v-amber" : "v-green"}">${fmtS(faturaKalan)}</b></span>
               <span>Harcama Kalan: <b class="mono ${maliyetKalan > 0 ? "v-red" : "v-green"}">${fmtS(maliyetKalan)}</b></span>
@@ -1183,6 +1401,7 @@ async function renderCari() {
           <div class="rowact">
             <button class="btn btn-amber btn-sm" data-hak="${c.id}">+ Hakediş</button>
             <button class="btn btn-green btn-sm" data-tah="${c.id}">+ Tahsilat</button>
+            <button class="btn btn-outline btn-sm" data-hiz="${c.id}">+ Hizmet</button>
             <button class="btn btn-outline btn-sm" data-detay="${c.id}">📄 Detay</button>
             <button class="btn btn-danger btn-sm" data-del="${c.id}">🗑</button>
           </div></div></div>`;
@@ -1206,6 +1425,13 @@ async function renderCari() {
     };
     $("cList").querySelectorAll("[data-hak]").forEach((b) => b.onclick = () => txForm(b.dataset.hak, "hakedis"));
     $("cList").querySelectorAll("[data-tah]").forEach((b) => b.onclick = () => txForm(b.dataset.tah, "tahsilat"));
+    $("cList").querySelectorAll("[data-hiz]").forEach((b) => b.onclick = () => {
+      const cid = b.dataset.hiz; const cust = custs.find((x) => x.id === cid);
+      const cProjs = projs.filter((p) => p.customer_id === cid || (p.customer && cust && p.customer.toLowerCase().trim() === cust.name.toLowerCase().trim()));
+      const source = cProjs.length ? cProjs : projs;
+      if (!source.length) { toast("Önce proje ekleyin"); return; }
+      hizmetForm(source.map((p) => ({ v: p.id, t: p.name })), null, load);
+    });
     $("cList").querySelectorAll("[data-detay]").forEach((b) => b.onclick = () => showDetay("musteri", b.dataset.detay, "cari"));
     $("cList").querySelectorAll("[data-del]").forEach((b) => b.onclick = () => del("customers", b.dataset.del, load));
   };
@@ -1309,11 +1535,14 @@ async function renderGiderler() {
 /* ---------- PROJELER (kâr/zarar: işçilik + gider + taşeron + malzemeci) ---------- */
 async function renderProjeler() {
   const el = $("page-projeler");
-  el.innerHTML = `<div class="page-head"><h2>Projeler — Kâr / Zarar</h2><button class="btn btn-amber btn-sm" id="pAdd">+ Yeni Proje</button></div><div id="pList" class="empty">Yükleniyor…</div>`;
+  let hideP = true; try { hideP = localStorage.getItem("hideP") !== "0"; } catch (e) {}
+  el.innerHTML = `<div class="page-head"><h2>Projeler — Kâr / Zarar</h2><button class="btn btn-amber btn-sm" id="pAdd">+ Yeni Proje</button></div>
+    <div class="searchrow"><label style="align-self:center;font-size:12px;"><input type="checkbox" id="pHidePassive" ${hideP ? "checked" : ""}> Tamamlananları gizle</label></div>
+    <div id="pList" class="empty">Yükleniyor…</div>`;
   
   const load = async () => {
-    const [projs, att, exp, cari, subtx, suptx, custs] = await Promise.all([
-      q("projects", { order: "created_at" }), q("attendance"), q("expenses"), q("cari_tx"), q("sub_tx"), q("supplier_tx"), q("customers")
+    const [projs, att, exp, cari, subtx, suptx, custs, hiz] = await Promise.all([
+      q("projects", { order: "created_at" }), q("attendance"), q("expenses"), q("cari_tx"), q("sub_tx"), q("supplier_tx"), q("customers"), q("services")
     ]);
     const cMap = {}; custs.forEach((c) => cMap[c.id] = c.name);
     const pFields = [
@@ -1323,25 +1552,29 @@ async function renderProjeler() {
       { key: "status", label: "Durum", type: "select", options: [{ v: "aktif", t: "Aktif" }, { v: "tamamlandi", t: "Tamamlandı" }, { v: "beklemede", t: "Beklemede" }] },
     ];
 
+    const shown = projs.filter((p) => !$("pHidePassive").checked || p.status === "aktif" || p.status === "beklemede");
     if (!projs.length) { $("pList").innerHTML = '<div class="empty">Henüz proje yok. "+ Yeni Proje" ile başlayın.</div>'; }
+    else if (!shown.length) { $("pList").innerHTML = '<div class="empty">Tüm projeler tamamlanmış — görmek için "Tamamlananları gizle" işaretini kaldırın.</div>'; }
     else {
-      $("pList").innerHTML = projs.map((p) => {
+      $("pList").innerHTML = shown.map((p) => {
         const isc = att.filter((a) => a.project_id === p.id).reduce((s, a) => s + +a.wage_amount, 0);
         const gid = exp.filter((a) => a.project_id === p.id).reduce((s, a) => s + +a.amount, 0);
         const tas = subtx.filter((a) => a.project_id === p.id && a.direction === "hakedis").reduce((s, a) => s + +a.amount, 0);
         const mal = suptx.filter((a) => a.project_id === p.id && a.direction === "borc").reduce((s, a) => s + +a.amount, 0);
-        const gel = cari.filter((a) => a.project_id === p.id && a.direction === "hakedis").reduce((s, a) => s + +a.amount, 0);
-        const net = gel - isc - gid - tas - mal;
+        const hizP = hiz.filter((h) => h.project_id === p.id).reduce((s, h) => s + +h.price, 0);
+        const hizC = hiz.filter((h) => h.project_id === p.id).reduce((s, h) => s + +h.cost, 0);
+        const gel = cari.filter((a) => a.project_id === p.id && a.direction === "hakedis").reduce((s, a) => s + +a.amount, 0) + hizP;
+        const net = gel - isc - gid - tas - mal - hizC;
         const custDisp = cMap[p.customer_id] || p.customer || "Müşteri yok";
         return `<div class="panel" style="margin-top:12px;">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">
-            <div><b style="font-size:15px;">${esc(p.name)}</b> <span class="pill">${p.status}</span><br><span style="font-size:12px;color:var(--dim);">${esc(custDisp)} ${p.contract_amount ? "· Sözleşme: " + fmt(p.contract_amount) : ""}</span></div>
-            <div class="rowact"><button class="btn btn-outline btn-sm" data-edit="${p.id}">✎</button><button class="btn btn-danger btn-sm" data-del="${p.id}">🗑</button></div>
+            <div><b style="font-size:15px;">${esc(p.name)}</b> <span class="pill">${STATUS_LABEL[p.status] || p.status}</span><br><span style="font-size:12px;color:var(--dim);">${esc(custDisp)} ${p.contract_amount ? "· Sözleşme: " + fmt(p.contract_amount) : ""}</span></div>
+            <div class="rowact"><button class="btn btn-outline btn-sm" data-detay="${p.id}">📄 Detay</button><button class="btn btn-outline btn-sm" data-toggle="${p.id}">${p.status === "aktif" ? "⏸ Pasif" : "▶ Aktif"}</button><button class="btn btn-outline btn-sm" data-edit="${p.id}">✎</button><button class="btn btn-danger btn-sm" data-del="${p.id}">🗑</button></div>
           </div>
           <div class="grid c4" style="margin-top:10px;">
-            <div class="stat"><div class="lbl">Gelir (Hakediş)</div><div class="val v-green">${fmt(gel)}</div></div>
+            <div class="stat"><div class="lbl">Gelir (Hakediş${hizP ? "+Hizmet" : ""})</div><div class="val v-green">${fmt(gel)}</div></div>
             <div class="stat"><div class="lbl">İşçilik</div><div class="val v-steel">${fmt(isc)}</div></div>
-            <div class="stat"><div class="lbl">Gider+Taşeron+Malzeme</div><div class="val v-red">${fmt(gid + tas + mal)}</div></div>
+            <div class="stat"><div class="lbl">Gider+Taşeron+Malzeme${hizC ? "+Hizmet" : ""}</div><div class="val v-red">${fmt(gid + tas + mal + hizC)}</div></div>
             <div class="stat"><div class="lbl">Net</div><div class="val ${net >= 0 ? "v-green" : "v-red"}">${fmtS(net)}</div></div>
           </div></div>`;
       }).join("");
@@ -1357,6 +1590,13 @@ async function renderProjeler() {
         toast("Güncellendi"); load();
       });
     });
+    $("pList").querySelectorAll("[data-detay]").forEach((b) => b.onclick = () => showDetay("proje", b.dataset.detay, "projeler"));
+    $("pList").querySelectorAll("[data-toggle]").forEach((b) => b.onclick = async () => {
+      const p = pBy[b.dataset.toggle];
+      const yeni = p.status === "aktif" ? "tamamlandi" : "aktif";
+      await upd("projects", p.id, { status: yeni });
+      toast(yeni === "aktif" ? `${p.name} yeniden aktif` : `${p.name} tamamlandı olarak işaretlendi`); load();
+    });
     $("pList").querySelectorAll("[data-del]").forEach((b) => b.onclick = () => del("projects", b.dataset.del, load));
     $("pAdd").onclick = () => openForm("Yeni Proje", pFields, { status: "aktif" }, async (v) => {
       const cust = custs.find(c => c.id === v.customer_id);
@@ -1365,6 +1605,7 @@ async function renderProjeler() {
       toast("Proje eklendi"); load();
     });
   };
+  $("pHidePassive").onchange = () => { try { localStorage.setItem("hideP", $("pHidePassive").checked ? "1" : "0"); } catch (e) {} load(); };
   load();
 }
 /* ---------- TAŞERONLAR ---------- */
@@ -1431,9 +1672,9 @@ async function renderPortfoy() {
   const load = async () => {
     const [props, cts] = await Promise.all([q("properties", { order: "created_at" }), q("contracts", { order: "created_at" })]);
     $("prTable").innerHTML = props.length ? `<table class="tbl"><tr><th>Ad</th><th>Tür</th><th>Değer</th><th>Durum</th><th></th></tr>` +
-      props.map((p) => `<tr><td>${esc(p.name)}</td><td><span class="pill">${p.prop_type}</span></td><td class="mono">${fmt(p.value)}</td><td>${p.status}</td><td class="rowact"><button class="btn btn-outline btn-sm" data-pedit="${p.id}">✎</button><button class="btn btn-danger btn-sm" data-pdel="${p.id}">🗑</button></td></tr>`).join("") + "</table>" : '<div class="empty">Kayıt yok</div>';
+      props.map((p) => `<tr><td>${esc(p.name)}</td><td><span class="pill">${PROP_LABEL[p.prop_type] || p.prop_type}</span></td><td class="mono">${fmt(p.value)}</td><td>${PROP_LABEL[p.status] || p.status}</td><td class="rowact"><button class="btn btn-outline btn-sm" data-pedit="${p.id}">✎</button><button class="btn btn-danger btn-sm" data-pdel="${p.id}">🗑</button></td></tr>`).join("") + "</table>" : '<div class="empty">Kayıt yok</div>';
     $("ctTable").innerHTML = cts.length ? `<table class="tbl"><tr><th>Ad</th><th>Tür</th><th>Tutar</th><th>Tarih</th><th></th></tr>` +
-      cts.map((c) => `<tr><td>${esc(c.name)}<br><span style="font-size:11px;color:var(--dim);">${esc(c.detail || "")}</span></td><td><span class="pill">${c.tur}</span></td><td class="mono">${fmt(c.amount)}</td><td>${dstr(c.tx_date)}</td><td class="rowact"><button class="btn btn-outline btn-sm" data-cedit="${c.id}">✎</button><button class="btn btn-danger btn-sm" data-cdel="${c.id}">🗑</button></td></tr>`).join("") + "</table>" : '<div class="empty">Kayıt yok</div>';
+      cts.map((c) => `<tr><td>${esc(c.name)}<br><span style="font-size:11px;color:var(--dim);">${esc(c.detail || "")}</span></td><td><span class="pill">${CT_LABEL[c.tur] || c.tur}</span></td><td class="mono">${fmt(c.amount)}</td><td>${dstr(c.tx_date)}</td><td class="rowact"><button class="btn btn-outline btn-sm" data-cedit="${c.id}">✎</button><button class="btn btn-danger btn-sm" data-cdel="${c.id}">🗑</button></td></tr>`).join("") + "</table>" : '<div class="empty">Kayıt yok</div>';
     const pBy = {}; props.forEach((p) => pBy[p.id] = p); const cBy = {}; cts.forEach((c) => cBy[c.id] = c);
     el.querySelectorAll("[data-pedit]").forEach((b) => b.onclick = () => openForm("Taşınmazı Düzenle", prFields, pBy[b.dataset.pedit], async (v) => { await upd("properties", b.dataset.pedit, v); toast("Güncellendi"); load(); }));
     el.querySelectorAll("[data-pdel]").forEach((b) => b.onclick = () => del("properties", b.dataset.pdel, load));
@@ -1447,7 +1688,19 @@ async function renderPortfoy() {
 
 /* ---------- RAPORLAR ---------- */
 function dlXlsx(rows, name, sheet) { if (!rows.length) { toast("Veri yok"); return; } const ws = XLSX.utils.json_to_sheet(rows); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, sheet || "Rapor"); XLSX.writeFile(wb, name); }
-function dlPdf(rows, name, title) { if (!rows.length) { toast("Veri yok"); return; } const { jsPDF } = window.jspdf; const doc = new jsPDF({ orientation: "landscape" }); doc.setFontSize(13); doc.text(title, 14, 15); const cols = Object.keys(rows[0]); doc.autoTable({ head: [cols], body: rows.map((r) => cols.map((c) => typeof r[c] === "number" ? r[c].toLocaleString("tr-TR") : (r[c] ?? ""))), startY: 21, styles: { fontSize: 8 } }); doc.save(name); }
+// font-tr.js yüklüyse Türkçe destekli font gömülü PDF üretir; yoksa jsPDF varsayılanına düşer
+function pdfDoc(orientation) {
+  const doc = new window.jspdf.jsPDF({ orientation: orientation || "landscape" });
+  if (window.PDF_TR_FONT) {
+    doc.addFileToVFS("tr.ttf", window.PDF_TR_FONT);
+    doc.addFont("tr.ttf", "tr", "normal");
+    doc.addFont("tr.ttf", "tr", "bold"); // autoTable başlıkları bold ister; aynı dosya iki stile kaydedilir
+    doc.setFont("tr");
+  }
+  return doc;
+}
+const pdfFontStyle = () => window.PDF_TR_FONT ? { font: "tr" } : {};
+function dlPdf(rows, name, title) { if (!rows.length) { toast("Veri yok"); return; } const doc = pdfDoc(); doc.setFontSize(13); doc.text(title, 14, 15); const cols = Object.keys(rows[0]); doc.autoTable({ head: [cols], body: rows.map((r) => cols.map((c) => typeof r[c] === "number" ? r[c].toLocaleString("tr-TR") : (r[c] ?? ""))), startY: 21, styles: { fontSize: 8, ...pdfFontStyle() } }); doc.save(name); }
 // koşan bakiyeli cari döküm — { tarih, aciklama, alacak, borc } dizisini tarihe göre sıralayıp kümülatif bakiye ekler
 function cariLedger(entries) {
   const sorted = [...entries].sort((a, b) => a.tarih.localeCompare(b.tarih));
@@ -1457,14 +1710,35 @@ function cariLedger(entries) {
 // dlPdf ile aynı, sadece negatif Bakiye'yi kırmızı gösterir (Excel'de SheetJS ücretsiz sürüm hücre rengini desteklemiyor, bu yüzden sadece PDF'te var)
 function dlPdfLedger(rows, name, title) {
   if (!rows.length) { toast("Veri yok"); return; }
-  const { jsPDF } = window.jspdf; const doc = new jsPDF({ orientation: "landscape" });
+  const doc = pdfDoc();
   doc.setFontSize(13); doc.text(title, 14, 15);
   const cols = ["Tarih", "Aciklama", "Alacak", "Borc", "Bakiye"];
   doc.autoTable({
     head: [cols],
     body: rows.map(r => cols.map(c => typeof r[c] === "number" ? r[c].toLocaleString("tr-TR") : (r[c] ?? ""))),
-    startY: 21, styles: { fontSize: 8 },
+    startY: 21, styles: { fontSize: 8, ...pdfFontStyle() },
     didParseCell: (d) => { if (d.section === "body" && d.column.index === 4 && rows[d.row.index].Bakiye < 0) d.cell.styles.textColor = [200, 30, 30]; },
+  });
+  doc.save(name);
+}
+// Proje sütunlu varyant (müşteri cari dökümü — birden çok projeyi tek tabloda toplar)
+// e.ic işaretli satırlarda Maliyet/Kar sütunları da kopyalanır (SADECE iç kullanım çıktısı — müşteriye gitmez)
+function cariLedgerProje(entries) {
+  const sorted = [...entries].sort((a, b) => a.tarih.localeCompare(b.tarih));
+  let bal = 0;
+  return sorted.map(e => { bal += (e.alacak || 0) - (e.borc || 0); const row = { Tarih: dstr(e.tarih), Proje: e.proje || "", Aciklama: e.aciklama, Alacak: e.alacak || 0, Borc: e.borc || 0, Bakiye: bal }; if (e.ic) { row.Maliyet = e.Maliyet ?? ""; row.Kar = e.Kar ?? ""; } return row; });
+}
+function dlPdfLedgerProje(rows, name, title, extraCols) {
+  if (!rows.length) { toast("Veri yok"); return; }
+  const doc = pdfDoc();
+  doc.setFontSize(13); doc.text(title, 14, 15);
+  const cols = ["Tarih", "Proje", "Aciklama", "Alacak", "Borc", "Bakiye"].concat(extraCols || []);
+  const bakIdx = cols.indexOf("Bakiye");
+  doc.autoTable({
+    head: [cols],
+    body: rows.map(r => cols.map(c => typeof r[c] === "number" ? r[c].toLocaleString("tr-TR") : (r[c] ?? ""))),
+    startY: 21, styles: { fontSize: 8, ...pdfFontStyle() },
+    didParseCell: (d) => { if (d.section === "body" && d.column.index === bakIdx && rows[d.row.index].Bakiye < 0) d.cell.styles.textColor = [200, 30, 30]; },
   });
   doc.save(name);
 }
@@ -1493,15 +1767,26 @@ async function renderRaporlar() {
         <button class="btn btn-amber btn-sm" id="rWx">📊 Excel</button> <button class="btn btn-outline btn-sm" id="rWp">📄 PDF</button>
         <div style="font-size:11px;color:var(--dim);margin-top:6px;">Maaşlı işçilerde aylık tahakkuk bu dökümde ayrı satır olarak görünmez (henüz takip edilmiyor).</div>
       </div>
-      <div class="panel"><h3>Proje/Müşteri Cari Dökümü</h3><div style="font-size:12px;color:var(--dim);margin-bottom:10px;">İşçilik+gider+taşeron+malzemeci (borç) − tahsilat (alacak), koşan bakiye</div>
+      <div class="panel"><h3>Proje Cari Dökümü</h3><div style="font-size:12px;color:var(--dim);margin-bottom:10px;">Tek proje: işçilik+gider+taşeron+malzemeci (borç) − tahsilat (alacak), koşan bakiye</div>
         <div class="searchrow"><select id="rProj" style="max-width:200px;"></select><label style="align-self:center;font-size:12px;"><input type="checkbox" id="rProjAll"> Tüm Zamanlar</label></div>
         <button class="btn btn-amber btn-sm" id="rPCx">📊 Excel</button> <button class="btn btn-outline btn-sm" id="rPCp">📄 PDF</button>
       </div>
+      <div class="panel"><h3>Müşteri Cari Dökümü</h3><div style="font-size:12px;color:var(--dim);margin-bottom:10px;">Müşterinin TÜM projelerinin toplu dökümü — her satırda proje adı, koşan bakiye. Bu haliyle müşteriye gönderilebilir (maliyet/kâr içermez).</div>
+        <div class="searchrow"><select id="rCust" style="max-width:200px;"></select><label style="align-self:center;font-size:12px;"><input type="checkbox" id="rCustAll"> Tüm Zamanlar</label></div>
+        <div class="searchrow"><label style="align-self:center;font-size:12px;color:var(--amber);"><input type="checkbox" id="rCustIc"> İç kullanım: hizmet maliyet/kâr sütunlarını ekle (MÜŞTERİYE GÖNDERMEYİN)</label></div>
+        <button class="btn btn-amber btn-sm" id="rMCx">📊 Excel</button> <button class="btn btn-outline btn-sm" id="rMCp">📄 PDF</button>
+      </div>
+      <div class="panel"><h3>Kasa Raporu (Tarih Aralığı)</h3><div style="font-size:12px;color:var(--dim);margin-bottom:10px;">Nakit / banka / kart bazında giriş-çıkış özeti ve hareket dökümü</div>
+        <button class="btn btn-outline btn-sm" id="rKGoster">👁 Göster</button>
+        <button class="btn btn-amber btn-sm" id="rKx">📊 Excel</button> <button class="btn btn-outline btn-sm" id="rKp">📄 PDF</button>
+        <div id="rKasaOut" style="margin-top:10px;"></div>
+      </div>
       <div class="panel"><h3>🗄️ TAM YEDEK — Tüm Veriler</h3><div style="font-size:12px;color:var(--dim);margin-bottom:10px;">Bütün tablolar tek Excel dosyasında, her tablo ayrı sayfa. Ay sonu arşivi için.</div><button class="btn btn-green btn-sm" id="rFull">📦 Tam Yedek İndir</button></div>
     </div>`;
-  const [rWorkers, rProjs] = await Promise.all([q("workers", { order: "name", asc: true }), q("projects", { order: "name", asc: true })]);
+  const [rWorkers, rProjs, rCusts] = await Promise.all([q("workers", { order: "name", asc: true }), q("projects", { order: "name", asc: true }), q("customers", { order: "name", asc: true })]);
   $("rWorker").innerHTML = rWorkers.map((w) => `<option value="${w.id}">${esc(w.name)}</option>`).join("") || '<option value="">İşçi yok</option>';
   $("rProj").innerHTML = rProjs.map((p) => `<option value="${p.id}">${esc(p.name)}</option>`).join("") || '<option value="">Proje yok</option>';
+  $("rCust").innerHTML = rCusts.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join("") || '<option value="">Müşteri yok</option>';
 
   async function isciCari(workerId, allMode, start, end) {
     const filt = (key) => allMode ? {} : { gte: { [key]: start }, lte: { [key]: end } };
@@ -1529,26 +1814,29 @@ async function renderRaporlar() {
     });
   }
   async function projeKZ() {
-    const [projs, att, exp, cari, subtx, suptx] = await Promise.all([q("projects"), q("attendance"), q("expenses"), q("cari_tx"), q("sub_tx"), q("supplier_tx")]);
+    const [projs, att, exp, cari, subtx, suptx, hiz] = await Promise.all([q("projects"), q("attendance"), q("expenses"), q("cari_tx"), q("sub_tx"), q("supplier_tx"), q("services")]);
     return projs.map((p) => {
       // NOT: maaşlı işçilerin aylık maaşı burada sayılmıyor — bkz. CLAUDE.md "Bilinen açık konular".
       const isc = att.filter((a) => a.project_id === p.id).reduce((s, a) => s + +a.wage_amount, 0);
       const gid = exp.filter((a) => a.project_id === p.id).reduce((s, a) => s + +a.amount, 0);
       const tas = subtx.filter((a) => a.project_id === p.id && a.direction === "hakedis").reduce((s, a) => s + +a.amount, 0);
       const mal = suptx.filter((a) => a.project_id === p.id && a.direction === "borc").reduce((s, a) => s + +a.amount, 0);
+      const hizP = hiz.filter((h) => h.project_id === p.id).reduce((s, h) => s + +h.price, 0);
+      const hizC = hiz.filter((h) => h.project_id === p.id).reduce((s, h) => s + +h.cost, 0);
       const gel = cari.filter((a) => a.project_id === p.id && a.direction === "hakedis").reduce((s, a) => s + +a.amount, 0);
-      return { Proje: p.name, Musteri: p.customer || "", Sozlesme: +p.contract_amount, Gelir: gel, Iscilik: isc, Gider: gid, Taseron: tas, Malzemeci: mal, Net: gel - isc - gid - tas - mal };
+      return { Proje: p.name, Musteri: p.customer || "", Sozlesme: +p.contract_amount, Gelir: gel, HizmetGelir: hizP, Iscilik: isc, Gider: gid, Taseron: tas, Malzemeci: mal, HizmetMaliyet: hizC, Net: gel + hizP - isc - gid - tas - mal - hizC };
     });
   }
   async function projeCari(projectId, allMode, start, end) {
     const filt = (key) => allMode ? {} : { gte: { [key]: start }, lte: { [key]: end } };
-    const [proj, att, exp, subtx, suptx, cari, workers, subs, sups] = await Promise.all([
+    const [proj, att, exp, subtx, suptx, cari, hiz, workers, subs, sups] = await Promise.all([
       q("projects", { eq: { id: projectId } }).then(r => r[0]),
       q("attendance", { eq: { project_id: projectId }, ...filt("work_date") }),
       q("expenses", { eq: { project_id: projectId }, ...filt("tx_date") }),
       q("sub_tx", { eq: { project_id: projectId }, ...filt("tx_date") }),
       q("supplier_tx", { eq: { project_id: projectId }, ...filt("tx_date") }),
       q("cari_tx", { eq: { project_id: projectId }, ...filt("tx_date") }),
+      q("services", { eq: { project_id: projectId }, ...filt("tx_date") }),
       q("workers"), q("subcontractors"), q("suppliers"),
     ]);
     const wn = {}; workers.forEach(w => wn[w.id] = w.name);
@@ -1559,9 +1847,70 @@ async function renderRaporlar() {
       ...exp.map(e => ({ tarih: e.tx_date, aciklama: `Gider: ${e.category}${e.note ? " — " + e.note : ""}`, alacak: 0, borc: +e.amount })),
       ...subtx.filter(t => t.direction === "hakedis").map(t => ({ tarih: t.tx_date, aciklama: `Taşeron: ${sn[t.sub_id] || "?"}${t.note ? " — " + t.note : ""}`, alacak: 0, borc: +t.amount })),
       ...suptx.filter(t => t.direction === "borc").map(t => ({ tarih: t.tx_date, aciklama: `Malzemeci: ${spn[t.supplier_id] || "?"}${t.note ? " — " + t.note : ""}`, alacak: 0, borc: +t.amount })),
+      // Hizmet: müşteri fiyatı borç — maliyet/kâr bu çıktıda ASLA yer almaz (müşteriye gönderilebilir)
+      ...hiz.map(h => ({ tarih: h.tx_date, aciklama: `Hizmet: ${h.title || ""}${h.note ? " — " + h.note : ""}`, alacak: 0, borc: +h.price })),
       ...cari.filter(t => t.direction === "tahsilat").map(t => ({ tarih: t.tx_date, aciklama: `Tahsilat${t.payment_method ? " (" + t.payment_method + ")" : ""}${t.note ? " — " + t.note : ""}`, alacak: +t.amount, borc: 0 })),
     ];
     return { proje: proj, rows: cariLedger(entries) };
+  }
+  // ic=true: SADECE iç kullanım — hizmet satırlarına Maliyet/Kar sütunları eklenir. Müşteriye gidecek çıktıda ASLA ic kullanma.
+  async function musteriCari(customerId, allMode, start, end, ic) {
+    const filt = (key) => allMode ? {} : { gte: { [key]: start }, lte: { [key]: end } };
+    const [cust, projs, workers, subs, sups] = await Promise.all([
+      q("customers", { eq: { id: customerId } }).then(r => r[0]),
+      q("projects"), q("workers"), q("subcontractors"), q("suppliers"),
+    ]);
+    const myProjects = projs.filter(p => p.customer_id === customerId || (p.customer && cust && p.customer.toLowerCase().trim() === cust.name.toLowerCase().trim()));
+    const myProjIds = new Set(myProjects.map(p => p.id));
+    const pn = {}; projs.forEach(p => pn[p.id] = p.name);
+    const wn = {}; workers.forEach(w => wn[w.id] = w.name);
+    const sn = {}; subs.forEach(s => sn[s.id] = s.name);
+    const spn = {}; sups.forEach(s => spn[s.id] = s.name);
+    const [att, exp, subtx, suptx, cari, hizAll] = await Promise.all([
+      q("attendance", filt("work_date")),
+      q("expenses", filt("tx_date")),
+      q("sub_tx", filt("tx_date")),
+      q("supplier_tx", filt("tx_date")),
+      q("cari_tx", { eq: { customer_id: customerId }, ...filt("tx_date") }),
+      q("services", filt("tx_date")),
+    ]);
+    const hiz = hizAll.filter(h => myProjIds.has(h.project_id));
+    const entries = [
+      ...att.filter(a => myProjIds.has(a.project_id) && +a.wage_amount > 0).map(a => ({ tarih: a.work_date, proje: pn[a.project_id] || "", aciklama: `İşçilik: ${wn[a.worker_id] || "?"} (${frLabel(a.fraction || 1)} gün)`, alacak: 0, borc: +a.wage_amount })),
+      ...exp.filter(e => myProjIds.has(e.project_id)).map(e => ({ tarih: e.tx_date, proje: pn[e.project_id] || "", aciklama: `Gider: ${e.category}${e.note ? " — " + e.note : ""}`, alacak: 0, borc: +e.amount })),
+      ...subtx.filter(t => myProjIds.has(t.project_id) && t.direction === "hakedis").map(t => ({ tarih: t.tx_date, proje: pn[t.project_id] || "", aciklama: `Taşeron: ${sn[t.sub_id] || "?"}${t.note ? " — " + t.note : ""}`, alacak: 0, borc: +t.amount })),
+      ...suptx.filter(t => myProjIds.has(t.project_id) && t.direction === "borc").map(t => ({ tarih: t.tx_date, proje: pn[t.project_id] || "", aciklama: `Malzeme: ${spn[t.supplier_id] || "?"}${t.note ? " — " + t.note : ""}`, alacak: 0, borc: +t.amount })),
+      // Hizmet: müşteri fiyatı borç; Maliyet/Kar yalnız ic modunda satıra eklenir
+      ...hiz.map(h => ({ tarih: h.tx_date, proje: pn[h.project_id] || "", aciklama: `Hizmet: ${h.title || ""}${h.note ? " — " + h.note : ""}`, alacak: 0, borc: +h.price, Maliyet: ic ? +h.cost : undefined, Kar: ic ? (+h.price - +h.cost) : undefined })),
+      ...cari.filter(t => t.direction === "tahsilat").map(t => ({ tarih: t.tx_date, proje: t.project_id ? (pn[t.project_id] || "") : "", aciklama: `Tahsilat${t.payment_method ? " (" + t.payment_method + ")" : ""}${t.note ? " — " + t.note : ""}`, alacak: +t.amount, borc: 0 })),
+    ];
+    if (ic) entries.forEach(e => { e.ic = true; });
+    return { customer: cust, rows: cariLedgerProje(entries) };
+  }
+  async function kasaRaporu(start, end) {
+    const filt = (key) => ({ gte: { [key]: start }, lte: { [key]: end } });
+    const [adv, pay, exp, suptx, subtx, cari, hiz, workers, sups, subs, custs] = await Promise.all([
+      q("advances", filt("tx_date")), q("payments", filt("tx_date")), q("expenses", filt("tx_date")),
+      q("supplier_tx", filt("tx_date")), q("sub_tx", filt("tx_date")), q("cari_tx", filt("tx_date")),
+      q("services", filt("tx_date")),
+      q("workers"), q("suppliers"), q("subcontractors"), q("customers"),
+    ]);
+    const wn = {}; workers.forEach((w) => wn[w.id] = w.name);
+    const spn = {}; sups.forEach((s) => spn[s.id] = s.name);
+    const sn = {}; subs.forEach((s) => sn[s.id] = s.name);
+    const cn = {}; custs.forEach((c) => cn[c.id] = c.name);
+    const Y = (m) => m || "belirtilmemiş";
+    const rows = [
+      ...cari.filter((t) => t.direction === "tahsilat").map((t) => ({ tarih: t.tx_date, Tur: "tahsilat", Yontem: Y(t.payment_method), Aciklama: "Tahsilat: " + (cn[t.customer_id] || "?") + (t.note ? " — " + t.note : ""), Giris: +t.amount || 0, Cikis: 0 })),
+      ...adv.map((a) => ({ tarih: a.tx_date, Tur: "avans", Yontem: Y(a.payment_method), Aciklama: "Avans: " + (wn[a.worker_id] || "?") + (a.note ? " — " + a.note : ""), Giris: 0, Cikis: +a.amount || 0 })),
+      ...pay.map((p2) => ({ tarih: p2.tx_date, Tur: "işçi ödeme", Yontem: Y(p2.payment_method), Aciklama: "Ödeme: " + (wn[p2.worker_id] || "?") + (p2.note ? " — " + p2.note : ""), Giris: 0, Cikis: +p2.amount || 0 })),
+      ...exp.map((e) => ({ tarih: e.tx_date, Tur: "gider", Yontem: Y(e.payment_method), Aciklama: "Gider: " + (e.category || "") + (e.note ? " — " + e.note : ""), Giris: 0, Cikis: +e.amount || 0 })),
+      ...suptx.filter((t) => t.direction === "odeme").map((t) => ({ tarih: t.tx_date, Tur: "malzemeci ödeme", Yontem: Y(t.payment_method), Aciklama: "Malzemeci: " + (spn[t.supplier_id] || "?") + (t.note ? " — " + t.note : ""), Giris: 0, Cikis: +t.amount || 0 })),
+      ...subtx.filter((t) => t.direction === "odeme").map((t) => ({ tarih: t.tx_date, Tur: "taşeron ödeme", Yontem: "belirtilmemiş", Aciklama: "Taşeron: " + (sn[t.sub_id] || "?") + (t.note ? " — " + t.note : ""), Giris: 0, Cikis: +t.amount || 0 })),
+      ...hiz.filter((h) => +h.cost > 0).map((h) => ({ tarih: h.tx_date, Tur: "hizmet maliyeti", Yontem: Y(h.payment_method), Aciklama: "Hizmet maliyeti: " + (h.title || ""), Giris: 0, Cikis: +h.cost || 0 })),
+    ];
+    rows.sort((a, b) => a.tarih.localeCompare(b.tarih));
+    return rows.map((r) => ({ Tarih: dstr(r.tarih), Tur: r.Tur, Yontem: r.Yontem, Aciklama: r.Aciklama, Giris: r.Giris, Cikis: r.Cikis }));
   }
   const range = () => ({ start: $("rStart").value, end: $("rEnd").value });
   async function cariDokum() {
@@ -1585,7 +1934,7 @@ async function renderRaporlar() {
   }
   async function fullBackup() {
     toast("Yedek hazırlanıyor…");
-    const tables = ["projects","workers","attendance","advances","payments","expenses","customers","cari_tx","suppliers","supplier_tx","subcontractors","sub_tx","properties","contracts","telegram_log"];
+    const tables = ["projects","workers","attendance","advances","payments","expenses","customers","cari_tx","suppliers","supplier_tx","subcontractors","sub_tx","services","properties","contracts","telegram_log"];
     const wb = XLSX.utils.book_new();
     for (const t of tables) {
       const rows = await q(t);
@@ -1609,7 +1958,20 @@ async function renderRaporlar() {
   $("rWx").onclick = async () => { const { worker, rows } = await isciCari($("rWorker").value, $("rWorkerAll").checked, $("rStart").value, $("rEnd").value); dlXlsx(rows, `isci-cari-${worker.name}.xlsx`, "İşçi Cari"); };
   $("rWp").onclick = async () => { const { worker, rows } = await isciCari($("rWorker").value, $("rWorkerAll").checked, $("rStart").value, $("rEnd").value); dlPdfLedger(rows, `isci-cari-${worker.name}.pdf`, `İşçi Cari Dökümü — ${worker.name}`); };
   $("rPCx").onclick = async () => { const { proje, rows } = await projeCari($("rProj").value, $("rProjAll").checked, $("rStart").value, $("rEnd").value); dlXlsx(rows, `proje-cari-${proje.name}.xlsx`, "Proje Cari"); };
-  $("rPCp").onclick = async () => { const { proje, rows } = await projeCari($("rProj").value, $("rProjAll").checked, $("rStart").value, $("rEnd").value); dlPdfLedger(rows, `proje-cari-${proje.name}.pdf`, `Proje/Müşteri Cari Dökümü — ${proje.name}`); };
+  $("rPCp").onclick = async () => { const { proje, rows } = await projeCari($("rProj").value, $("rProjAll").checked, $("rStart").value, $("rEnd").value); dlPdfLedger(rows, `proje-cari-${proje.name}.pdf`, `Proje Cari Dökümü — ${proje.name}`); };
+  $("rMCx").onclick = async () => { const ic = $("rCustIc").checked; const { customer, rows } = await musteriCari($("rCust").value, $("rCustAll").checked, $("rStart").value, $("rEnd").value, ic); dlXlsx(rows, `musteri-cari-${customer.name}${ic ? "-IC-KULLANIM" : ""}.xlsx`, "Müşteri Cari"); };
+  $("rMCp").onclick = async () => { const ic = $("rCustIc").checked; const { customer, rows } = await musteriCari($("rCust").value, $("rCustAll").checked, $("rStart").value, $("rEnd").value, ic); dlPdfLedgerProje(rows, `musteri-cari-${customer.name}${ic ? "-IC-KULLANIM" : ""}.pdf`, `Müşteri Cari Dökümü — ${customer.name}${ic ? " (İÇ KULLANIM)" : ""}`, ic ? ["Maliyet", "Kar"] : undefined); };
+  $("rKGoster").onclick = async () => {
+    const rows = await kasaRaporu($("rStart").value, $("rEnd").value);
+    const by = {};
+    rows.forEach((r) => { const b = by[r.Yontem] = by[r.Yontem] || { g: 0, c: 0 }; b.g += r.Giris; b.c += r.Cikis; });
+    const keys = Object.keys(by);
+    $("rKasaOut").innerHTML = keys.length
+      ? `<div class="tblwrap"><table class="tbl"><tr><th>Yöntem</th><th>Giriş</th><th>Çıkış</th><th>Net</th></tr>${keys.map((k) => `<tr><td><span class="pill">${esc(k)}</span></td><td class="mono v-green">${fmt(by[k].g)}</td><td class="mono v-red">${fmt(by[k].c)}</td><td class="mono ${by[k].g - by[k].c >= 0 ? "v-green" : "v-red"}">${fmtS(by[k].g - by[k].c)}</td></tr>`).join("")}</table></div>`
+      : '<div class="empty">Bu aralıkta hareket yok</div>';
+  };
+  $("rKx").onclick = async () => dlXlsx(await kasaRaporu($("rStart").value, $("rEnd").value), `kasa-${$("rStart").value}-${$("rEnd").value}.xlsx`, "Kasa");
+  $("rKp").onclick = async () => dlPdf(await kasaRaporu($("rStart").value, $("rEnd").value), `kasa-${$("rStart").value}-${$("rEnd").value}.pdf`, "Kasa Raporu");
   $("rFull").onclick = fullBackup;
 }
 
@@ -1651,6 +2013,9 @@ async function renderAyarlar() {
   };
   $("logoutBtn").onclick = async () => { await sb.auth.signOut(); location.reload(); };
 }
+
+/* ---------- PWA: service worker kaydı (sadece https'te; yerel dosyada sessizce atlanır) ---------- */
+if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
 
 /* ---------- otomatik giriş ---------- */
 if (CFG_OK) boot();
