@@ -195,6 +195,7 @@ table.tbl tr:last-child td{border-bottom:none;}
     <div class="nav-item" data-page="giderler"><span>🧾</span>Giderler</div>
     <div class="nav-item" data-page="projeler"><span>🏗️</span>Projeler</div>
     <div class="nav-item" data-page="taseron"><span>🔧</span>Taşeronlar</div>
+    <div class="nav-item" data-page="depo"><span>🔨</span>Demirbaş & Depo</div>
     <div class="nav-item" data-page="portfoy"><span>🏠</span>Portföy & Sözleşme</div>
     <div class="nav-item" data-page="sonlar"><span>🕒</span>Son Hareketler</div>
     <div class="nav-item" data-page="raporlar"><span>📁</span>Raporlar</div>
@@ -215,6 +216,7 @@ table.tbl tr:last-child td{border-bottom:none;}
     <div class="page" id="page-ayarlar"></div>
     <div class="page" id="page-detay"></div>
     <div class="page" id="page-sonlar"></div>
+    <div class="page" id="page-depo"></div>
   </div>
 </div>
 <div class="tabbar"><div class="tabbar-inner">
@@ -306,6 +308,9 @@ function openForm(title, fields, initial, onSave, extraBtn) {
     }
     if (f.type === "file") {
       return `<div class="fld"><label>${esc(f.label)}</label><input id="ff_${f.key}" type="file" accept="image/*"></div>`;
+    }
+    if (f.type === "textarea") {
+      return `<div class="fld"><label>${esc(f.label)}</label><textarea id="ff_${f.key}" rows="4" style="resize:vertical;">${esc(v)}</textarea></div>`;
     }
     return `<div class="fld"><label>${esc(f.label)}</label><input id="ff_${f.key}" type="${f.type || "text"}" value="${esc(v)}"></div>`;
   }).join("") + `<div class="actions"><button class="btn btn-outline" id="ffCancel">Vazgeç</button>${extraBtn || ""}<button class="btn btn-amber" id="ffSave">Kaydet</button></div>`;
@@ -429,12 +434,12 @@ async function boot() {
 }
 
 /* ---------- gezinme + Diğer menüsü + FAB ---------- */
-const PAGES = { panel: renderPanel, puantaj: renderPuantaj, isciler: renderIsciler, cari: renderCari, malzemeci: renderMalzemeci, giderler: renderGiderler, projeler: renderProjeler, taseron: renderTaseron, portfoy: renderPortfoy, raporlar: renderRaporlar, ayarlar: renderAyarlar, detay: renderDetay, sonlar: renderSonlar };
+const PAGES = { panel: renderPanel, puantaj: renderPuantaj, isciler: renderIsciler, cari: renderCari, malzemeci: renderMalzemeci, giderler: renderGiderler, projeler: renderProjeler, taseron: renderTaseron, depo: renderDepo, portfoy: renderPortfoy, raporlar: renderRaporlar, ayarlar: renderAyarlar, detay: renderDetay, sonlar: renderSonlar };
 function nav(p) {
   if (p === "diger") {
     const box = $("modalBox");
     box.innerHTML = `<h3>Diğer</h3><div class="qa-menu">` +
-      [["projeler","🏗️ Projeler"],["malzemeci","🧱 Malzemeciler"],["taseron","🔧 Taşeronlar"],["portfoy","🏠 Portföy & Sözleşme"],["sonlar","🕒 Son Hareketler"],["raporlar","📁 Raporlar"],["ayarlar","⚙️ Ayarlar"]]
+      [["projeler","🏗️ Projeler"],["malzemeci","🧱 Malzemeciler"],["taseron","🔧 Taşeronlar"],["depo","🔨 Demirbaş & Depo"],["portfoy","🏠 Portföy & Sözleşme"],["sonlar","🕒 Son Hareketler"],["raporlar","📁 Raporlar"],["ayarlar","⚙️ Ayarlar"]]
         .map(([k,t]) => `<button class="btn btn-outline" data-nav="${k}">${t}</button>`).join("") +
       `</div><div class="actions"><button class="btn btn-outline" id="dgClose">Kapat</button></div>`;
     $("modalOverlay").classList.add("open");
@@ -538,6 +543,14 @@ async function q(table, opts = {}) {
     if (!data || data.length < PAGE) break;
   }
   return all;
+}
+// Sessiz sorgu: tablo henüz oluşturulmamışsa (migration çalıştırılmadan) toast atmadan boş döner.
+// V7 tabloları (tools/stock/site_notes) için kullanılır ki eski veritabanında uygulama kırılmasın.
+async function qSilent(table, opts = {}) {
+  let query = sb.from(table).select("*");
+  if (opts.eq) for (const [k, v] of Object.entries(opts.eq)) query = query.eq(k, v);
+  const { data, error } = await query;
+  return error ? [] : (data || []);
 }
 async function ins(table, row) {
   row.company_id = myCompany.id;
@@ -794,14 +807,14 @@ function showDetay(type, id, backTo) {
   nav("detay");
 }
 
-const DETAY_KIND_LABEL = { isci: "İşçi", musteri: "Müşteri", malzemeci: "Malzemeci", taseron: "Taşeron", proje: "Proje" };
+const DETAY_KIND_LABEL = { isci: "İşçi", musteri: "Müşteri", malzemeci: "Malzemeci", taseron: "Taşeron", proje: "Proje", alet: "Alet", stok: "Stok" };
 
 async function renderDetay() {
   const el = $("page-detay");
   el.innerHTML = `<div class="page-head"><h2>Detay</h2></div><div class="empty">Yükleniyor…</div>`;
   const st = detayState;
   if (!st) { el.innerHTML = '<div class="empty">Kayıt seçilmedi. Lütfen bir liste sayfasından "Detay" ile açın.</div>'; return; }
-  const loaders = { isci: detayIsci, musteri: detayMusteri, malzemeci: detayMalzemeci, taseron: detayTaseron, proje: detayProje };
+  const loaders = { isci: detayIsci, musteri: detayMusteri, malzemeci: detayMalzemeci, taseron: detayTaseron, proje: detayProje, alet: detayAlet, stok: detayStok };
   const data = await loaders[st.type](st.id);
   if (!data) { el.innerHTML = `<div class="page-head"><button class="btn btn-outline btn-sm" id="detayBack">← Geri</button></div><div class="empty">Kayıt bulunamadı (silinmiş olabilir).</div>`;
     $("detayBack").onclick = () => nav(st.backTo || "panel"); return; }
@@ -811,7 +824,7 @@ async function renderDetay() {
       <td>${dstr(r.tarih)}</td>
       <td><span class="pill">${esc(r.tur)}</span></td>
       <td>${r.aciklama}${r.extra || ""}</td>
-      <td class="mono ${r.tutar >= 0 ? "v-green" : "v-red"}">${fmtS(r.tutar)}</td>
+      <td class="mono ${r.tutar == null ? "" : r.tutar >= 0 ? "v-green" : "v-red"}">${r.tutar == null ? "" : fmtS(r.tutar)}</td>
       ${showBak ? `<td class="mono ${r.bakClass}">${r.bakiye == null ? "—" : fmtS(r.bakiye)}</td>` : ""}
       <td class="rowact">${(r.editFn || r.delFn) ? `${r.editFn ? `<button class="btn btn-outline btn-sm" data-dedit="${r.key}">✎</button>` : ""}${r.delFn ? `<button class="btn btn-danger btn-sm" data-ddel="${r.key}">🗑</button>` : ""}` : ""}</td>
     </tr>`;
@@ -853,6 +866,7 @@ async function renderDetay() {
   const byKey = {}; data.rows.forEach((r) => byKey[r.key] = r);
   el.querySelectorAll("[data-dedit]").forEach((b) => b.onclick = () => byKey[b.dataset.dedit].editFn(() => renderDetay()));
   el.querySelectorAll("[data-ddel]").forEach((b) => b.onclick = () => byKey[b.dataset.ddel].delFn(() => renderDetay()));
+  if (data.wire) data.wire(el, () => renderDetay()); // loader'ın kendi bölümlerinin (örn. proje günlüğü) buton bağları
 }
 
 /* --- Loader: İşçi (puantaj + avans + ödeme, kronolojik, koşan bakiye) --- */
@@ -1119,7 +1133,7 @@ async function detayTaseron(subId) {
 
 /* --- Loader: Proje (işçilik+gider+taşeron+malzeme borç, tahsilat alacak; koşan bakiye) --- */
 async function detayProje(projectId) {
-  const [p, att, exp, subtx, suptx, cari, hiz, workers, subs, sups, custs] = await Promise.all([
+  const [p, att, exp, subtx, suptx, cari, hiz, workers, subs, sups, custs, notes] = await Promise.all([
     q("projects", { eq: { id: projectId } }).then((r) => r[0]),
     q("attendance", { eq: { project_id: projectId } }),
     q("expenses", { eq: { project_id: projectId } }),
@@ -1128,6 +1142,7 @@ async function detayProje(projectId) {
     q("cari_tx", { eq: { project_id: projectId } }),
     q("services", { eq: { project_id: projectId } }),
     q("workers"), q("subcontractors"), q("suppliers"), q("customers"),
+    qSilent("site_notes", { eq: { project_id: projectId } }),
   ]);
   if (!p) return null;
   const wn = {}; workers.forEach((w) => wn[w.id] = w.name);
@@ -1199,6 +1214,22 @@ async function detayProje(projectId) {
     <div class="stat"><div class="lbl">Tahsilat</div><div class="val v-green">${fmt(tahsilat)}</div></div>
   </div>`;
   const shareText = `${p.name} — Gelir: ${fmt(gelir)}, Maliyet: ${fmt(maliyet)}, Tahmini Kâr/Zarar: ${fmtS(net)}, Tahsilat: ${fmt(tahsilat)} · ${dstr(today())}`;
+
+  // Şantiye günlüğü: iş raporları / notlar / yarın planları (V7)
+  notes.sort((a, b) => String(b.note_date + (b.created_at || "")).localeCompare(String(a.note_date + (a.created_at || ""))));
+  const gunlukHtml = `<div class="panel" style="margin-bottom:14px;"><h3>📓 Günlük & Notlar (${notes.length})</h3>
+    ${notes.slice(0, 20).map((n) => `<div class="tx-item">
+      <div style="min-width:0;"><span class="pill">${esc(NOTE_KIND[n.kind] || "Not")}</span> <b>${dstr(n.note_date)}</b> — ${esc(n.content)}${n.created_by ? ' <span style="font-size:11px;color:var(--faint);">· ' + esc(n.created_by) + "</span>" : ""}</div>
+      <div style="display:flex;gap:6px;flex-shrink:0;"><button class="btn btn-outline btn-sm" data-notedit="${n.id}">✎</button><button class="btn btn-danger btn-sm" data-notdel="${n.id}">🗑</button></div>
+    </div>`).join("") || '<div class="empty">Henüz not yok — "+ Not" ile şantiye günlüğü tutmaya başlayın (Telegram\'dan "not: ..." da yazılabilir)</div>'}
+    ${notes.length > 20 ? '<div style="font-size:11.5px;color:var(--dim);margin-top:8px;">Son 20 not gösteriliyor — tamamı Son Hareketler → Günlük/Notlar filtresinde.</div>' : ""}
+  </div>`;
+  const nBy = {}; notes.forEach((n) => nBy[n.id] = n);
+  const wire = (el, cb) => {
+    el.querySelectorAll("[data-notedit]").forEach((b) => b.onclick = () => notForm(p.id, nBy[b.dataset.notedit], cb));
+    el.querySelectorAll("[data-notdel]").forEach((b) => b.onclick = () => del("site_notes", b.dataset.notdel, cb));
+  };
+
   const actions = [
     { label: "+ Puantaj", fn: (cb) => puantajForm({ project_id: p.id }, cb) },
     { label: "+ Gider", fn: (cb) => giderForm(null, cb, p.id) },
@@ -1206,8 +1237,9 @@ async function detayProje(projectId) {
     { label: "+ Taşeron Hakedişi", fn: (cb) => subTxForm(null, "hakedis", p.id, cb) },
     { label: "+ Tahsilat", fn: (cb) => { if (!p.customer_id) { toast("Projeye müşteri bağlı değil — Projeler sayfasından ✎ ile müşteri seçin"); return; } cariTxForm(p.customer_id, "tahsilat", p.id, cb); } },
     { label: "+ Hizmet", fn: (cb) => hizmetForm([{ v: p.id, t: p.name }], null, cb) },
+    { label: "+ Not", fn: (cb) => notForm(p.id, null, cb) },
   ];
-  return { title: p.name, statsHtml, rows: entries, shareText, actions };
+  return { title: p.name, statsHtml: statsHtml + gunlukHtml, rows: entries, shareText, actions, wire };
 }
 
 /* --- Edit: Avans / Ödeme (işçi cari) --- */
@@ -1442,7 +1474,12 @@ const SON_TYPES = {
   thakedis: { table: "sub_tx",      label: "taşeron hakediş", filter: (r) => r.direction === "hakedis" },
   todeme:   { table: "sub_tx",      label: "taşeron ödeme",   filter: (r) => r.direction === "odeme" },
   hizmet:   { table: "services",    label: "hizmet" },
+  zimmet:   { table: "tool_moves",  label: "zimmet" },
+  stok:     { table: "stock_moves", label: "stok" },
+  not:      { table: "site_notes",  label: "not" },
 };
+// V7 tabloları — migration çalıştırılmamışsa sessizce boş dönmeli (toast fırtınası olmasın)
+const SON_SILENT_TABLES = new Set(["tool_moves", "stock_moves", "site_notes"]);
 const SON_FILTERS = {
   hepsi:     { t: "Hepsi", types: Object.keys(SON_TYPES) },
   puantaj:   { t: "Puantaj", types: ["puantaj"] },
@@ -1451,16 +1488,23 @@ const SON_FILTERS = {
   malzemeci: { t: "Malzemeci (alım/ödeme)", types: ["alim", "modeme"] },
   gider:     { t: "Gider", types: ["gider"] },
   taseron:   { t: "Taşeron (hakediş/ödeme)", types: ["thakedis", "todeme"] },
+  depo:      { t: "Depo (zimmet/stok)", types: ["zimmet", "stok"] },
+  notlar:    { t: "Günlük / Notlar", types: ["not"] },
 };
 
 async function sonMaps() {
-  const [workers, projs, custs, sups, subs] = await Promise.all([q("workers"), q("projects"), q("customers"), q("suppliers"), q("subcontractors")]);
-  const m = { w: {}, p: {}, c: {}, sp: {}, sc: {} };
+  const [workers, projs, custs, sups, subs, tools, sitems] = await Promise.all([
+    q("workers"), q("projects"), q("customers"), q("suppliers"), q("subcontractors"),
+    qSilent("tools"), qSilent("stock_items"),
+  ]);
+  const m = { w: {}, p: {}, c: {}, sp: {}, sc: {}, t: {}, si: {} };
   workers.forEach((x) => m.w[x.id] = x); // editAtt işçi nesnesinin tamamını ister
   projs.forEach((x) => m.p[x.id] = x.name);
   custs.forEach((x) => m.c[x.id] = x.name);
   sups.forEach((x) => m.sp[x.id] = x.name);
   subs.forEach((x) => m.sc[x.id] = x.name);
+  tools.forEach((x) => m.t[x.id] = x.code + " · " + x.name);
+  sitems.forEach((x) => m.si[x.id] = x);
   return m;
 }
 
@@ -1503,6 +1547,21 @@ function sonRow(typeKey, r, maps) {
     tutar = +r.price || 0;
     const projOpts = Object.keys(maps.p).map((id) => ({ v: id, t: maps.p[id] }));
     editFn = (cb) => hizmetForm(projOpts, r, cb); delFn = (cb) => del("services", r.id, cb);
+  } else if (typeKey === "zimmet") {
+    // zimmet hareketi düzenlenmez/silinmez — tools satırıyla tutarlılık bozulur; düzeltme = ters hareket girmek
+    aciklama = esc(maps.t[r.tool_id] || "?") + ": " + esc(r.from_text || "?") + " → " + esc(r.to_text || "?") + nt + pp;
+    tutar = null;
+  } else if (typeKey === "stok") {
+    const it = maps.si[r.item_id];
+    const d = +r.delta || 0;
+    aciklama = esc((it && it.name) || "?") + ": " + (d > 0 ? "+" : "") + d + " " + esc((it && it.unit) || "") + nt + pp;
+    tutar = null;
+    editFn = (cb) => editStokMove(r, cb); delFn = (cb) => del("stock_moves", r.id, cb);
+  } else if (typeKey === "not") {
+    const c = r.content || "";
+    aciklama = '<span class="pill">' + esc(NOTE_KIND[r.kind] || "Not") + "</span> " + esc(c.slice(0, 80)) + (c.length > 80 ? "…" : "") + pp;
+    tutar = null;
+    editFn = (cb) => notForm(null, r, cb); delFn = (cb) => del("site_notes", r.id, cb);
   }
   return { key: typeKey + "_" + r.id, zaman: r.created_at, tur: T.label, kim: r.created_by || "", aciklama, tutar, editFn, delFn };
 }
@@ -1511,7 +1570,7 @@ function sonRow(typeKey, r, maps) {
 async function sonFetch(filterKey) {
   const types = SON_FILTERS[filterKey].types;
   const tables = [...new Set(types.map((k) => SON_TYPES[k].table))];
-  const [maps, ...tableData] = await Promise.all([sonMaps(), ...tables.map((t) => q(t))]);
+  const [maps, ...tableData] = await Promise.all([sonMaps(), ...tables.map((t) => SON_SILENT_TABLES.has(t) ? qSilent(t) : q(t))]);
   const byTable = {}; tables.forEach((t, i) => byTable[t] = tableData[i]);
   const rows = [];
   types.forEach((k) => {
@@ -1574,8 +1633,8 @@ async function renderSonlar() {
         <td><span class="pill">${esc(r.tur)}</span></td>
         <td>${r.kim ? '<span class="pill">' + esc(r.kim) + "</span>" : ""}</td>
         <td>${r.aciklama}</td>
-        <td class="mono">${fmt(r.tutar)}</td>
-        <td class="rowact"><button class="btn btn-outline btn-sm" data-se="${r.key}">✎</button><button class="btn btn-danger btn-sm" data-sd="${r.key}">🗑</button></td>
+        <td class="mono">${r.tutar == null ? "" : fmt(r.tutar)}</td>
+        <td class="rowact">${r.editFn ? `<button class="btn btn-outline btn-sm" data-se="${r.key}">✎</button>` : ""}${r.delFn ? `<button class="btn btn-danger btn-sm" data-sd="${r.key}">🗑</button>` : ""}</td>
       </tr>`).join("")}
     </table></div>` : '<div class="empty">Kayıt bulunamadı</div>';
     const from = filtered.length ? sonState.page * PAGEN + 1 : 0;
@@ -1613,9 +1672,9 @@ async function renderSonBlock(containerId, filterKey, reloadCb) {
   rows = rows.slice(0, 5);
   box.innerHTML = `<div class="panel"><h3>🕒 Son Girilenler</h3>
     ${rows.map((r) => `<div class="tx-item">
-      <div style="min-width:0;"><span class="pill">${esc(r.tur)}</span> ${r.aciklama} <b class="mono">${fmt(r.tutar)}</b><br>
+      <div style="min-width:0;"><span class="pill">${esc(r.tur)}</span> ${r.aciklama} ${r.tutar == null ? "" : `<b class="mono">${fmt(r.tutar)}</b>`}<br>
         <span style="font-size:11px;color:var(--faint);">${dtstr(r.zaman)}${r.kim ? " · " + esc(r.kim) : ""}</span></div>
-      <div style="display:flex;gap:6px;flex-shrink:0;"><button class="btn btn-outline btn-sm" data-be="${r.key}">✎</button><button class="btn btn-danger btn-sm" data-bd="${r.key}">🗑</button></div>
+      <div style="display:flex;gap:6px;flex-shrink:0;">${r.editFn ? `<button class="btn btn-outline btn-sm" data-be="${r.key}">✎</button>` : ""}${r.delFn ? `<button class="btn btn-danger btn-sm" data-bd="${r.key}">🗑</button>` : ""}</div>
     </div>`).join("") || '<div class="empty">Henüz kayıt yok</div>'}
     <div style="margin-top:10px;"><button class="btn btn-outline btn-sm" data-more="1">Devamını göster →</button></div>
   </div>`;
@@ -1988,6 +2047,263 @@ async function renderTaseron() {
   renderSonBlock("sSonBlk", "taseron", () => nav("taseron"));
 }
 
+/* ---------- DEMİRBAŞ & DEPO (V7) ---------- */
+const TOOL_STATUS = { depoda: "Depoda", zimmetli: "Zimmetli", arizali: "Arızalı", kayip: "Kayıp" };
+const NOTE_KIND = { rapor: "İş Raporu", not: "Not", plan: "Yarın Planı" };
+
+// Teslim/iade: tool_moves'a geçmiş satırı + tools satırında durum/kimde güncellemesi.
+// Zimmet düzeltmesi = ters hareket girmek; hareket satırları silinmez (geçmiş bozulmasın).
+async function toolMove(tool, action, toWorker, projectId, note, cb) {
+  const fromText = tool.holder_worker_id ? (tool._holderName || "Zimmetli") : "Depo";
+  const toText = action === "teslim" ? (toWorker ? toWorker.name : "?") : action === "iade" ? "Depo" : (TOOL_STATUS[action] || action);
+  await ins("tool_moves", { tool_id: tool.id, action, to_worker_id: toWorker ? toWorker.id : null, to_text: toText, from_text: fromText, project_id: projectId || null, note: note || null });
+  const status = action === "teslim" ? "zimmetli" : action === "iade" ? "depoda" : action;
+  await upd("tools", tool.id, { status, holder_worker_id: toWorker ? toWorker.id : null, project_id: projectId || null });
+  toast(action === "iade" ? tool.code + " depoya alındı" : tool.code + " → " + toText);
+  cb && cb();
+}
+async function teslimForm(tool, cb) {
+  const [workers, projs] = await Promise.all([q("workers", { order: "name", asc: true }), q("projects", { order: "name", asc: true })]);
+  const act = workers.filter((w) => w.active !== false);
+  if (!act.length) { toast("Aktif işçi yok — önce İşçiler sayfasından ekleyin"); return; }
+  openForm(`${tool.code} · ${tool.name} — Teslim Et`, [
+    { key: "wid", label: "Kime", type: "select", options: act.map((w) => ({ v: w.id, t: w.name })), required: true },
+    { key: "project_id", label: "Hangi şantiyede (ops.)", type: "select", options: [{ v: "", t: "Belirtilmedi" }].concat(projs.map((p) => ({ v: p.id, t: p.name }))) },
+    { key: "note", label: "Not" },
+  ], null, async (v) => {
+    const w = act.find((x) => x.id === v.wid);
+    await toolMove(tool, "teslim", w, v.project_id, v.note, cb);
+  });
+}
+function toolForm(existing, cb) {
+  openForm(existing ? "Aleti Düzenle" : "Yeni Alet / Demirbaş", [
+    { key: "code", label: "Kod (etikete yazılacak — örn: M1)", required: true },
+    { key: "name", label: "Ad (örn: Matkap)", required: true },
+    { key: "note", label: "Not (marka/model/seri no vb.)" },
+  ], existing, async (v) => {
+    v.code = (v.code || "").toLocaleUpperCase("tr").trim();
+    if (existing) { await upd("tools", existing.id, { code: v.code, name: v.name, note: v.note }); toast("Güncellendi"); }
+    else { await ins("tools", { ...v, status: "depoda" }); toast("Alet eklendi — etiketini yazdırmayı unutmayın"); }
+    cb && cb();
+  });
+}
+function stokItemForm(existing, cb) {
+  openForm(existing ? "Malzemeyi Düzenle" : "Yeni Stok Malzemesi", [
+    { key: "name", label: "Ad (örn: Çimento)", required: true },
+    { key: "unit", label: "Birim", type: "select", options: ["adet", "torba", "kg", "ton", "m", "m2", "m3", "lt", "paket", "kutu"].map((u) => ({ v: u, t: u })) },
+    { key: "min_qty", label: "Minimum uyarı miktarı (altına düşünce ⚠ — ops.)", type: "number" },
+    { key: "note", label: "Not" },
+  ], existing || { unit: "adet" }, async (v) => {
+    if (existing) { await upd("stock_items", existing.id, v); toast("Güncellendi"); }
+    else { await ins("stock_items", v); toast("Malzeme eklendi — şimdi + Giriş ile mevcut miktarı girin"); }
+    cb && cb();
+  });
+}
+async function stokMoveForm(item, sign, cb) {
+  const projs = await q("projects", { order: "name", asc: true });
+  openForm(`${item.name} — ${sign > 0 ? "Stok Girişi (+)" : "Stok Çıkışı (−)"}`, [
+    { key: "qty", label: `Miktar (${item.unit})`, type: "number", required: true },
+    { key: "project_id", label: sign > 0 ? "Proje (ops.)" : "Hangi şantiyeye (ops.)", type: "select", options: [{ v: "", t: "Belirtilmedi" }].concat(projs.map((p) => ({ v: p.id, t: p.name }))) },
+    { key: "note", label: "Not" },
+  ], null, async (v) => {
+    if (!(v.qty > 0)) { toast("Miktar 0'dan büyük olmalı"); return; }
+    await ins("stock_moves", { item_id: item.id, delta: sign * v.qty, project_id: v.project_id, note: v.note });
+    toast("Kaydedildi"); cb && cb();
+  });
+}
+function editStokMove(mv, cb) {
+  openForm("Stok Hareketini Düzelt", [
+    { key: "delta", label: "Miktar (giriş +, çıkış −)", type: "number", required: true },
+    { key: "note", label: "Not" },
+  ], mv, async (v) => { await upd("stock_moves", mv.id, v); toast("Güncellendi"); cb && cb(); });
+}
+async function notForm(presetProjectId, existing, cb) {
+  const projs = await q("projects", { order: "name", asc: true });
+  openForm(existing ? "Notu Düzenle" : "Günlük / Not Ekle", [
+    { key: "note_date", label: "Tarih", type: "date", def: today() },
+    { key: "kind", label: "Tür", type: "select", options: [{ v: "rapor", t: "İş Raporu (bugün yapılan)" }, { v: "not", t: "Not" }, { v: "plan", t: "Yarın Planı / Yapılacaklar" }] },
+    { key: "project_id", label: "Proje", type: "select", options: [{ v: "", t: "Genel (projesiz)" }].concat(projs.map((p) => ({ v: p.id, t: p.name }))) },
+    { key: "content", label: "İçerik", type: "textarea", required: true },
+  ], existing || { kind: "not", project_id: presetProjectId || "" }, async (v) => {
+    if (existing) { await upd("site_notes", existing.id, v); toast("Güncellendi"); }
+    else { await ins("site_notes", v); toast("Not eklendi"); }
+    cb && cb();
+  });
+}
+// Basılabilir etiketler: A4'te 8 etiket (2x4) — kod ÇOK büyük (bot fotoğraftan okuyabilsin)
+function etiketPdf(tools) {
+  const doc = pdfDoc();
+  const fs = pdfFontStyle();
+  const W = 92, H = 62, X0 = 10, Y0 = 12, GAP = 4, PER = 8;
+  tools.forEach((t, i) => {
+    const idx = i % PER;
+    if (i > 0 && idx === 0) doc.addPage();
+    const col = idx % 2, row = Math.floor(idx / 2);
+    const x = X0 + col * (W + GAP), y = Y0 + row * (H + GAP);
+    doc.setDrawColor(80); doc.setLineWidth(0.6); doc.rect(x, y, W, H);
+    if (fs.font) doc.setFont(fs.font, "normal");
+    doc.setFontSize(52); doc.text(String(t.code), x + W / 2, y + 30, { align: "center" });
+    doc.setFontSize(15); doc.text(String(t.name), x + W / 2, y + 43, { align: "center" });
+    doc.setFontSize(8.5); doc.text("SOYLU İNŞAAT — zimmet takibindedir", x + W / 2, y + 55, { align: "center" });
+  });
+  doc.save("alet-etiketleri.pdf");
+}
+
+async function renderDepo() {
+  const el = $("page-depo");
+  el.innerHTML = `<div class="page-head"><h2>Demirbaş & Depo</h2>
+      <span>
+        <button class="btn btn-outline btn-sm" id="tEtiket">🖨 Etiket PDF</button>
+        <button class="btn btn-amber btn-sm" id="tAdd">+ Alet</button>
+      </span></div>
+    <div class="panel"><h3>El Aletleri / Demirbaş</h3><div id="tList" class="empty">Yükleniyor…</div></div>
+    <div class="panel"><h3>Depo Stok</h3>
+      <div class="searchrow"><button class="btn btn-amber btn-sm" id="siAdd">+ Malzeme</button></div>
+      <div id="siList" class="empty">Yükleniyor…</div>
+    </div>
+    <div id="depoSonBlk"></div>`;
+  let toolsCache = [];
+  const load = async () => {
+    const [tools, moves, workers, items, smoves] = await Promise.all([
+      q("tools", { order: "code", asc: true }),
+      q("tool_moves", { order: "created_at", asc: false }),
+      q("workers"),
+      q("stock_items", { order: "name", asc: true }),
+      q("stock_moves"),
+    ]);
+    toolsCache = tools;
+    const wn = {}; workers.forEach((w) => wn[w.id] = w.name);
+    const lastMove = {}; moves.forEach((m) => { if (!lastMove[m.tool_id]) lastMove[m.tool_id] = m; }); // desc sıralı → ilk görülen en yeni
+    const days = (ts) => ts ? Math.floor((Date.now() - new Date(ts).getTime()) / 864e5) : null;
+
+    $("tList").innerHTML = tools.length ? `<div class="tblwrap"><table class="tbl">
+      <tr><th>Kod</th><th>Ad</th><th>Durum</th><th>Kimde</th><th>Süre</th><th></th></tr>
+      ${tools.map((t) => {
+        const lm = lastMove[t.id];
+        const d = days(lm ? lm.created_at : t.created_at);
+        const stCls = t.status === "depoda" ? "v-green" : t.status === "zimmetli" ? "v-amber" : "v-red";
+        return `<tr>
+          <td class="mono" style="font-weight:700;">${esc(t.code)}</td>
+          <td>${esc(t.name)}${t.note ? ' <span style="font-size:11px;color:var(--faint);">' + esc(t.note) + "</span>" : ""}</td>
+          <td><span class="pill ${stCls}">${TOOL_STATUS[t.status] || t.status}</span></td>
+          <td>${t.holder_worker_id ? esc(wn[t.holder_worker_id] || "?") : "—"}</td>
+          <td style="font-size:11.5px;color:var(--dim);">${d == null ? "" : d === 0 ? "bugün" : d + " gündür"}</td>
+          <td class="rowact">
+            ${t.status === "depoda" ? `<button class="btn btn-amber btn-sm" data-teslim="${t.id}">Teslim Et</button>` : `<button class="btn btn-green btn-sm" data-iade="${t.id}">Depoya Al</button>`}
+            <button class="btn btn-outline btn-sm" data-tdetay="${t.id}">📄</button>
+            <button class="btn btn-outline btn-sm" data-tedit="${t.id}">✎</button>
+            <button class="btn btn-danger btn-sm" data-tdel="${t.id}">🗑</button>
+          </td></tr>`;
+      }).join("")}
+    </table></div>` : '<div class="empty">Henüz alet eklenmedi. "+ Alet" ile başlayın; kod verin (örn: M1), etiketi yazdırıp aletin üzerine yapıştırın.</div>';
+
+    const qty = {}; smoves.forEach((m) => qty[m.item_id] = (qty[m.item_id] || 0) + Number(m.delta || 0));
+    $("siList").innerHTML = items.length ? `<div class="tblwrap"><table class="tbl">
+      <tr><th>Malzeme</th><th>Mevcut</th><th></th></tr>
+      ${items.map((it) => {
+        const n = qty[it.id] || 0;
+        const low = it.min_qty != null && n < Number(it.min_qty);
+        return `<tr>
+          <td>${esc(it.name)}${low ? ' <span class="pending">⚠ azaldı</span>' : ""}</td>
+          <td class="mono ${low ? "v-red" : ""}">${n} ${esc(it.unit)}</td>
+          <td class="rowact">
+            <button class="btn btn-green btn-sm" data-sin="${it.id}">+ Giriş</button>
+            <button class="btn btn-outline btn-sm" data-sout="${it.id}">− Çıkış</button>
+            <button class="btn btn-outline btn-sm" data-sdetay="${it.id}">📄</button>
+            <button class="btn btn-outline btn-sm" data-sedit="${it.id}">✎</button>
+            <button class="btn btn-danger btn-sm" data-sdel="${it.id}">🗑</button>
+          </td></tr>`;
+      }).join("")}
+    </table></div>` : '<div class="empty">Henüz stok malzemesi yok. "+ Malzeme" ile ekleyin (örn: Çimento, torba).</div>';
+
+    const tBy = {}; tools.forEach((t) => tBy[t.id] = t);
+    const iBy = {}; items.forEach((it) => iBy[it.id] = it);
+    $("tList").querySelectorAll("[data-teslim]").forEach((b) => b.onclick = () => teslimForm(tBy[b.dataset.teslim], load));
+    $("tList").querySelectorAll("[data-iade]").forEach((b) => b.onclick = () => { const t = tBy[b.dataset.iade]; t._holderName = wn[t.holder_worker_id]; toolMove(t, "iade", null, null, null, load); });
+    $("tList").querySelectorAll("[data-tdetay]").forEach((b) => b.onclick = () => showDetay("alet", b.dataset.tdetay, "depo"));
+    $("tList").querySelectorAll("[data-tedit]").forEach((b) => b.onclick = () => toolForm(tBy[b.dataset.tedit], load));
+    $("tList").querySelectorAll("[data-tdel]").forEach((b) => b.onclick = () => del("tools", b.dataset.tdel, load));
+    $("siList").querySelectorAll("[data-sin]").forEach((b) => b.onclick = () => stokMoveForm(iBy[b.dataset.sin], 1, load));
+    $("siList").querySelectorAll("[data-sout]").forEach((b) => b.onclick = () => stokMoveForm(iBy[b.dataset.sout], -1, load));
+    $("siList").querySelectorAll("[data-sdetay]").forEach((b) => b.onclick = () => showDetay("stok", b.dataset.sdetay, "depo"));
+    $("siList").querySelectorAll("[data-sedit]").forEach((b) => b.onclick = () => stokItemForm(iBy[b.dataset.sedit], load));
+    $("siList").querySelectorAll("[data-sdel]").forEach((b) => b.onclick = () => del("stock_items", b.dataset.sdel, load));
+  };
+  $("tAdd").onclick = () => toolForm(null, load);
+  $("siAdd").onclick = () => stokItemForm(null, load);
+  $("tEtiket").onclick = () => { if (!toolsCache.length) { toast("Önce alet ekleyin"); return; } etiketPdf(toolsCache); };
+  load();
+  renderSonBlock("depoSonBlk", "depo", () => nav("depo"));
+}
+
+/* --- Loader: Alet (zimmet geçmişi kronolojik) --- */
+async function detayAlet(toolId) {
+  const [t, moves, workers] = await Promise.all([
+    qSilent("tools", { eq: { id: toolId } }).then((r) => r[0]),
+    qSilent("tool_moves", { eq: { tool_id: toolId } }),
+    q("workers"),
+  ]);
+  if (!t) return null;
+  const wn = {}; workers.forEach((w) => wn[w.id] = w.name);
+  moves.sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+  const entries = moves.map((m) => ({
+    key: "tm_" + m.id, tarih: m.created_at,
+    tur: m.action === "teslim" ? "teslim" : m.action === "iade" ? "iade" : m.action,
+    aciklama: '<span class="mono" style="font-size:11px;color:var(--faint);">' + esc(dtstr(m.created_at).split(" ").pop() || "") + "</span> " +
+      esc(m.from_text || "?") + " → <b>" + esc(m.to_text || "?") + "</b>" +
+      (m.note ? " — " + esc(m.note) : "") + (m.created_by ? ' <span class="pill">' + esc(m.created_by) + "</span>" : ""),
+    tutar: null, bakiye: null,
+  })).reverse(); // en yeni üstte
+  const kimde = t.holder_worker_id ? (wn[t.holder_worker_id] || "?") : "Depoda";
+  const statsHtml = `<div class="grid c4" style="margin-bottom:14px;">
+    <div class="stat"><div class="lbl">Durum</div><div class="val ${t.status === "depoda" ? "v-green" : t.status === "zimmetli" ? "v-amber" : "v-red"}" style="font-size:16px;">${TOOL_STATUS[t.status] || t.status}</div></div>
+    <div class="stat"><div class="lbl">Kimde</div><div class="val" style="font-size:16px;">${esc(kimde)}</div></div>
+    <div class="stat"><div class="lbl">Hareket Sayısı</div><div class="val">${moves.length}</div></div>
+  </div>`;
+  const actions = t.status === "depoda"
+    ? [{ label: "Teslim Et", fn: (cb) => teslimForm(t, cb) }]
+    : [{ label: "Depoya Al", fn: (cb) => { t._holderName = wn[t.holder_worker_id]; toolMove(t, "iade", null, null, null, cb); } }];
+  const shareText = `${t.code} ${t.name} — ${t.status === "depoda" ? "Depoda" : kimde + " üzerinde"} · ${dstr(today())}`;
+  return { title: t.code + " · " + t.name, statsHtml, rows: entries, shareText, actions };
+}
+
+/* --- Loader: Stok kalemi (giriş/çıkış geçmişi, koşan miktar) --- */
+async function detayStok(itemId) {
+  const [it, moves, projs] = await Promise.all([
+    qSilent("stock_items", { eq: { id: itemId } }).then((r) => r[0]),
+    qSilent("stock_moves", { eq: { item_id: itemId } }),
+    q("projects"),
+  ]);
+  if (!it) return null;
+  const pn = {}; projs.forEach((p) => pn[p.id] = p.name);
+  moves.sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+  let run = 0;
+  const entries = moves.map((m) => {
+    const d = Number(m.delta || 0); run += d;
+    return {
+      key: "sm_" + m.id, tarih: m.created_at, tur: d > 0 ? "giriş" : "çıkış",
+      aciklama: "<b>" + (d > 0 ? "+" : "") + d + " " + esc(it.unit) + "</b>" +
+        (m.project_id ? ' <span class="pill">' + esc(pn[m.project_id] || "?") + "</span>" : "") +
+        (m.note ? " — " + esc(m.note) : "") + " · kalan: " + run + " " + esc(it.unit) +
+        (m.created_by ? ' <span class="pill">' + esc(m.created_by) + "</span>" : ""),
+      tutar: null, bakiye: null,
+      editFn: (cb) => editStokMove(m, cb), delFn: (cb) => del("stock_moves", m.id, cb),
+    };
+  }).reverse();
+  const low = it.min_qty != null && run < Number(it.min_qty);
+  const statsHtml = `<div class="grid c4" style="margin-bottom:14px;">
+    <div class="stat"><div class="lbl">Mevcut Miktar</div><div class="val ${low ? "v-red" : "v-green"}">${run} ${esc(it.unit)}</div></div>
+    ${it.min_qty != null ? `<div class="stat"><div class="lbl">Uyarı Sınırı</div><div class="val" style="font-size:16px;">${it.min_qty} ${esc(it.unit)} ${low ? "⚠" : ""}</div></div>` : ""}
+    <div class="stat"><div class="lbl">Hareket Sayısı</div><div class="val">${moves.length}</div></div>
+  </div>`;
+  const actions = [
+    { label: "+ Giriş", fn: (cb) => stokMoveForm(it, 1, cb) },
+    { label: "− Çıkış", fn: (cb) => stokMoveForm(it, -1, cb) },
+  ];
+  const shareText = `${it.name}: ${run} ${it.unit} depoda · ${dstr(today())}`;
+  return { title: it.name, statsHtml, rows: entries, shareText, actions };
+}
+
 /* ---------- PORTFÖY & SÖZLEŞME ---------- */
 async function renderPortfoy() {
   const el = $("page-portfoy");
@@ -2316,6 +2632,186 @@ async function renderRaporlar() {
 }
 
 /* ---------- AYARLAR ---------- */
+/* ---------- EXCEL İÇE AKTARMA (V7) ---------- */
+const IMP_TURLER = {
+  avans:    { t: "İşçi Avansı",     table: "advances",    entity: "workers",   entLabel: "İşçi",      dcol: "tx_date" },
+  iodeme:   { t: "İşçi Ödemesi",    table: "payments",    entity: "workers",   entLabel: "İşçi",      dcol: "tx_date" },
+  gider:    { t: "Gider",           table: "expenses",    entity: null,        entLabel: "",          dcol: "tx_date" },
+  tahsilat: { t: "Tahsilat",        table: "cari_tx",     entity: "customers", entLabel: "Müşteri",   dcol: "tx_date", extra: { direction: "tahsilat" } },
+  hakedis:  { t: "Hakediş/Fatura",  table: "cari_tx",     entity: "customers", entLabel: "Müşteri",   dcol: "tx_date", extra: { direction: "hakedis" } },
+  alim:     { t: "Malzemeci Alım",  table: "supplier_tx", entity: "suppliers", entLabel: "Malzemeci", dcol: "tx_date", extra: { direction: "borc" } },
+  modeme:   { t: "Malzemeci Ödeme", table: "supplier_tx", entity: "suppliers", entLabel: "Malzemeci", dcol: "tx_date", extra: { direction: "odeme" } },
+  puantaj:  { t: "Puantaj",         table: "attendance",  entity: "workers",   entLabel: "İşçi",      dcol: "work_date", puantaj: true },
+};
+// Excel hücresinden tarih: seri numarası, "dd.mm.yyyy" (./,-) veya ISO
+function xlDate(v) {
+  if (v == null || v === "") return null;
+  if (typeof v === "number" && v > 20000 && v < 60000) {
+    const d = new Date(Math.round((v - 25569) * 86400 * 1000));
+    return isNaN(d) ? null : d.toISOString().slice(0, 10);
+  }
+  const s = String(v).trim();
+  let m = s.match(/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{2,4})/);
+  if (m) { let y = +m[3]; if (y < 100) y += 2000; return `${y}-${String(+m[2]).padStart(2, "0")}-${String(+m[1]).padStart(2, "0")}`; }
+  m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return s.slice(0, 10);
+  return null;
+}
+// Excel hücresinden tutar: 1.250,50 / 1250.5 / "₺1.250" hepsi çözülür
+function xlNum(v) {
+  if (typeof v === "number") return v;
+  if (v == null) return null;
+  const s = String(v).replace(/[^\d.,-]/g, "");
+  if (!s) return null;
+  const n = s.includes(",") ? parseFloat(s.replace(/\./g, "").replace(",", ".")) : parseFloat(s);
+  return isNaN(n) ? null : n;
+}
+function setupImport() {
+  let wb = null, aoa = [], parsed = [];
+  const nrm = (s) => String(s || "").toLocaleLowerCase("tr").trim();
+  const fEl = $("impFile"), shEl = $("impSheet"), turEl = $("impTur"), headEl = $("impHead"), mapEl = $("impMap"), prevEl = $("impPrev");
+  turEl.innerHTML = '<option value="">— Kayıt türü seçin —</option>' + Object.entries(IMP_TURLER).map(([k, c]) => `<option value="${k}">${c.t}</option>`).join("");
+  fEl.onchange = async () => {
+    const file = fEl.files[0]; if (!file) return;
+    try { wb = XLSX.read(await file.arrayBuffer(), { type: "array" }); }
+    catch (e) { toast("Dosya okunamadı: " + (e.message || e)); return; }
+    shEl.innerHTML = wb.SheetNames.map((n, i) => `<option value="${i}">${esc(n)}</option>`).join("");
+    shEl.style.display = ""; turEl.style.display = "";
+    loadSheet();
+  };
+  const loadSheet = () => {
+    if (!wb) return;
+    aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[+shEl.value]], { header: 1, raw: true });
+    headEl.innerHTML = aoa.slice(0, 5).map((r, i) => `<option value="${i}">Başlık ${i + 1}. satırda: ${esc((r || []).slice(0, 4).map((c) => String(c ?? "")).join(" | ").slice(0, 42))}</option>`).join("");
+    headEl.style.display = "";
+    drawMap();
+  };
+  shEl.onchange = loadSheet;
+  headEl.onchange = () => drawMap();
+  turEl.onchange = () => drawMap();
+  const drawMap = () => {
+    prevEl.innerHTML = "";
+    const turKey = turEl.value;
+    if (!turKey || !aoa.length) { mapEl.innerHTML = ""; return; }
+    const cfg = IMP_TURLER[turKey];
+    const hdr = aoa[+headEl.value] || [];
+    const colOpts = '<option value="">— Sütun —</option>' + hdr.map((h, i) => `<option value="${i}">${String.fromCharCode(65 + (i % 26))}: ${esc(String(h ?? "").slice(0, 18))}</option>`).join("");
+    const need = [["c_tarih", "Tarih *"]];
+    if (cfg.entity) need.push(["c_isim", cfg.entLabel + " Adı *"]);
+    if (cfg.puantaj) need.push(["c_kesir", "Gün Kesri (boş=1)"]);
+    else need.push(["c_tutar", "Tutar *"]);
+    need.push(["c_aciklama", "Açıklama"], ["c_proje", "Proje Adı"]);
+    mapEl.innerHTML = need.map(([id, lbl]) => `<span style="display:flex;flex-direction:column;font-size:11px;color:var(--dim);gap:3px;">${lbl}<select id="${id}" style="max-width:150px;">${colOpts}</select></span>`).join("") + `<button class="btn btn-amber btn-sm" id="impPrevBtn" style="align-self:flex-end;">Önizle →</button>`;
+    $("impPrevBtn").onclick = preview;
+  };
+  const preview = async () => {
+    const cfg = IMP_TURLER[turEl.value];
+    const gv = (id) => { const e = document.getElementById(id); return e && e.value !== "" ? +e.value : null; };
+    const ci = { tarih: gv("c_tarih"), isim: gv("c_isim"), tutar: gv("c_tutar"), kesir: gv("c_kesir"), aciklama: gv("c_aciklama"), proje: gv("c_proje") };
+    if (ci.tarih == null) { toast("Tarih sütununu seçin"); return; }
+    if (cfg.entity && ci.isim == null) { toast(cfg.entLabel + " adı sütununu seçin"); return; }
+    if (!cfg.puantaj && ci.tutar == null) { toast("Tutar sütununu seçin"); return; }
+    const [ents, projs] = await Promise.all([cfg.entity ? q(cfg.entity) : Promise.resolve([]), q("projects")]);
+    parsed = [];
+    for (let i = +headEl.value + 1; i < aoa.length; i++) {
+      const row = aoa[i] || [];
+      const rawName = ci.isim != null ? String(row[ci.isim] ?? "").trim() : "";
+      const hasAny = row.some((c) => c != null && String(c).trim() !== "");
+      if (!hasAny) continue;
+      const item = {
+        tarih: xlDate(row[ci.tarih]), isim: rawName,
+        tutar: cfg.puantaj ? null : xlNum(row[ci.tutar]),
+        kesir: cfg.puantaj ? ([1, 0.5, 1.5].includes(xlNum(row[ci.kesir])) ? xlNum(row[ci.kesir]) : 1) : null,
+        aciklama: ci.aciklama != null ? String(row[ci.aciklama] ?? "").trim() : "",
+        proje: ci.proje != null ? String(row[ci.proje] ?? "").trim() : "",
+        err: null, skip: false,
+      };
+      if (!item.tarih) item.err = "tarih okunamadı";
+      else if (!cfg.puantaj && (item.tutar == null || !(item.tutar > 0))) item.err = "tutar okunamadı";
+      else if (cfg.entity && !item.isim) item.err = "isim boş";
+      if (cfg.entity && !item.err) {
+        const e = ents.find((x) => nrm(x.name) === nrm(item.isim)) || ents.find((x) => nrm(x.name).includes(nrm(item.isim)) || nrm(item.isim).includes(nrm(x.name)));
+        if (e) { item.entId = e.id; item.entName = e.name; item.wage = e.daily_wage; }
+        else item.isNew = true;
+      }
+      if (cfg.puantaj && !item.err) {
+        if (item.isNew) item.err = "işçi kayıtlı değil — puantaj için önce işçiyi yevmiyesiyle ekleyin";
+        else if (!item.wage) item.err = "yevmiye tanımsız";
+      }
+      if (item.proje && !item.err) {
+        const p = projs.find((x) => nrm(x.name) === nrm(item.proje)) || projs.find((x) => nrm(x.name).includes(nrm(item.proje)) || nrm(item.proje).includes(nrm(x.name)));
+        if (p) { item.projId = p.id; item.projName = p.name; }
+      }
+      if (item.err) item.skip = true;
+      parsed.push(item);
+    }
+    if (cfg.puantaj) { // dosya içi 1,5 gün kontrolü
+      const tot = {};
+      parsed.filter((x) => !x.skip).forEach((x) => {
+        const k = x.entId + "_" + x.tarih;
+        tot[k] = (tot[k] || 0) + x.kesir;
+        if (tot[k] > 1.5) { x.err = "gün toplamı 1,5'i aşıyor"; x.skip = true; }
+      });
+    }
+    drawPreview(cfg);
+  };
+  const drawPreview = (cfg) => {
+    const ok = parsed.filter((x) => !x.err);
+    const yeni = new Set(ok.filter((x) => x.isNew).map((x) => nrm(x.isim)));
+    prevEl.innerHTML = `<div style="font-size:12.5px;margin:10px 0;">Toplam <b>${parsed.length}</b> satır · aktarılabilir <b class="v-green">${ok.length}</b> · hatalı <b class="v-red">${parsed.length - ok.length}</b> · yeni açılacak: <b class="v-amber">${yeni.size}</b></div>
+      <div class="tblwrap" style="max-height:320px;overflow-y:auto;"><table class="tbl">
+      <tr><th></th><th>Tarih</th>${cfg.entity ? "<th>İsim</th>" : ""}<th>${cfg.puantaj ? "Kesir" : "Tutar"}</th><th>Durum</th></tr>
+      ${parsed.slice(0, 30).map((x, idx) => `<tr>
+        <td><input type="checkbox" data-imp="${idx}" ${x.skip ? "" : "checked"} ${x.err ? "disabled" : ""}></td>
+        <td class="mono">${x.tarih ? dstr(x.tarih) : "—"}</td>
+        ${cfg.entity ? `<td>${esc(x.isim)}</td>` : ""}
+        <td class="mono">${cfg.puantaj ? x.kesir : (x.tutar == null ? "—" : fmt(x.tutar))}</td>
+        <td style="font-size:11px;">${x.err ? '<span class="v-red">' + esc(x.err) + "</span>" : x.isNew ? '<span class="v-amber">YENİ açılacak</span>' : cfg.entity ? '<span class="v-green">✓ ' + esc(x.entName || "") + "</span>" : '<span class="v-green">✓</span>'}${x.projName ? ' <span class="pill">' + esc(x.projName) + "</span>" : ""}</td>
+      </tr>`).join("")}
+      </table></div>
+      ${parsed.length > 30 ? '<div style="font-size:11.5px;color:var(--dim);margin-top:6px;">İlk 30 satır gösteriliyor; aktarım hatasız TÜM satırları kapsar.</div>' : ""}
+      <div style="margin-top:10px;"><button class="btn btn-amber" id="impGo">📥 Aktar (${ok.length} satır)</button></div>`;
+    prevEl.querySelectorAll("[data-imp]").forEach((c) => c.onchange = () => { parsed[+c.dataset.imp].skip = !c.checked; });
+    $("impGo").onclick = () => doImport(cfg);
+  };
+  const doImport = async (cfg) => {
+    const rows = parsed.filter((x) => !x.skip && !x.err);
+    if (!rows.length) { toast("Aktarılacak satır yok"); return; }
+    if (!window.confirm(rows.length + " satır \"" + cfg.t + "\" olarak aktarılacak. Devam edilsin mi?")) return;
+    $("impGo").disabled = true; $("impGo").textContent = "Aktarılıyor…";
+    const entCache = {};
+    let okN = 0, errN = 0; const errs = [];
+    for (const x of rows) {
+      try {
+        let entId = x.entId;
+        if (cfg.entity && !entId) {
+          const key = nrm(x.isim);
+          if (!entCache[key]) {
+            const { data, error } = await sb.from(cfg.entity).insert({ company_id: myCompany.id, name: x.isim, created_by: "Excel" }).select().single();
+            if (error) throw error;
+            entCache[key] = data.id;
+          }
+          entId = entCache[key];
+        }
+        const row = { created_by: "Excel" };
+        row[cfg.dcol] = x.tarih;
+        if (cfg.extra) Object.assign(row, cfg.extra);
+        if (x.projId) row.project_id = x.projId;
+        if (cfg.table === "advances" || cfg.table === "payments") { row.worker_id = entId; row.amount = x.tutar; row.note = x.aciklama || null; }
+        else if (cfg.table === "cari_tx") { row.customer_id = entId; row.amount = x.tutar; row.note = x.aciklama || null; }
+        else if (cfg.table === "supplier_tx") { row.supplier_id = entId; row.amount = x.tutar; row.note = x.aciklama || null; }
+        else if (cfg.table === "expenses") { row.category = "diger"; row.amount = x.tutar; row.note = x.aciklama || null; }
+        else if (cfg.table === "attendance") { row.worker_id = entId; row.fraction = x.kesir; row.wage_amount = Math.round(x.wage * x.kesir * 100) / 100; }
+        await ins(cfg.table, row);
+        okN++;
+      } catch (e) { errN++; if (errs.length < 5) errs.push((x.isim || "") + " " + (x.tarih || "") + ": " + (e.message || e)); }
+    }
+    $("impGo").disabled = false; $("impGo").textContent = "📥 Aktar";
+    prevEl.insertAdjacentHTML("beforeend", `<div class="panel" style="margin-top:10px;"><h3>Aktarım Sonucu</h3><div style="font-size:13px;line-height:1.7;">✅ ${okN} kayıt aktarıldı${errN ? ` · ❌ ${errN} satır hata verdi` : ""}${errs.length ? "<br>" + errs.map(esc).join("<br>") : ""}<br>Kayıtlar <b>Son Hareketler</b>'de "Excel" imzasıyla görünür — kontrol edin.</div></div>`);
+    toast(okN + " kayıt aktarıldı");
+  };
+}
+
 async function renderAyarlar() {
   const el = $("page-ayarlar");
   const users = await q("profiles", { select: "full_name, role, created_at" });
@@ -2342,6 +2838,21 @@ async function renderAyarlar() {
     <div class="panel"><h3>Kullanıcılar</h3><table class="tbl"><tr><th>Ad</th><th>Rol</th><th>Katılım</th></tr>
       ${users.map((u) => `<tr><td>${esc(u.full_name)}</td><td><span class="pill">${u.role}</span></td><td>${dstr(u.created_at)}</td></tr>`).join("")}</table>
       <div style="font-size:12px;color:var(--dim);margin-top:8px;">Silme işlemleri yalnızca yönetici rolüyle yapılabilir (puantaj düzeltmeleri hariç). Rol değişikliği: Supabase > Table Editor > profiles.</div></div>
+    <div class="panel"><h3>📥 Excel İçe Aktarma</h3>
+      <div style="font-size:12px;color:var(--dim);margin-bottom:10px;line-height:1.6;">
+        Eski Excel kayıtlarınızı sisteme aktarır: dosya seçin → sayfa ve kayıt türünü seçin → sütunları eşleştirin → önizleyin → aktarın.<br>
+        <b>Öneri:</b> Çok eski yıllar için satır satır aktarmak yerine tek satır "devir" bakiyesi girin (örn. müşteriye "2024 devri" açıklamalı tek hakediş); son dönemi detay aktarın.
+        Aktarılan her kayıt <b>Son Hareketler</b>'de "Excel" imzasıyla görünür — yanlış aktarımı oradan temizleyebilirsiniz.
+      </div>
+      <div class="searchrow">
+        <input type="file" id="impFile" accept=".xlsx,.xls,.csv" style="max-width:250px;">
+        <select id="impSheet" style="max-width:170px;display:none;"></select>
+        <select id="impTur" style="max-width:190px;display:none;"></select>
+        <select id="impHead" style="max-width:200px;display:none;"></select>
+      </div>
+      <div id="impMap" class="searchrow" style="align-items:flex-end;"></div>
+      <div id="impPrev"></div>
+    </div>
     <div class="panel"><h3>Oturum</h3><button class="btn btn-danger" id="logoutBtn">Çıkış Yap</button></div>`;
   $("setTheme").onchange = (e) => {
     document.body.classList.toggle("light", e.target.value === "light");
@@ -2352,6 +2863,7 @@ async function renderAyarlar() {
     try { localStorage.setItem("bigfont", e.target.value === "big" ? "1" : "0"); } catch (err) {}
   };
   $("logoutBtn").onclick = async () => { await sb.auth.signOut(); location.reload(); };
+  setupImport();
 }
 
 /* ---------- PWA: service worker kaydı (sadece https'te; yerel dosyada sessizce atlanır) ---------- */
