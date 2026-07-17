@@ -35,5 +35,9 @@ jobs:
             echo "job=morning" >> $GITHUB_OUTPUT
           fi
       - name: Botu tetikle
+        env:
+          FUNC_URL: ${{ secrets.FUNC_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          JOB: ${{ steps.job.outputs.job }}
         run: |
-          curl -s -X POST "${{ secrets.FUNC_URL }}?cron=${{ steps.job.outputs.job }}&secret=${{ secrets.CRON_SECRET }}"
+          curl -s -X POST "${FUNC_URL}?cron=${JOB}&secret=${CRON_SECRET}"
