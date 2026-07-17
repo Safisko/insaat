@@ -92,6 +92,24 @@ body.light .nav-item.active{color:#8a5e00;}
 .qa-menu{display:flex;flex-direction:column;gap:8px;}
 .qa-menu .btn{text-align:left;}
 
+/* --- Uygulama içi sohbet (app-chat) --- */
+.chat-launch{position:fixed;right:16px;bottom:138px;width:54px;height:54px;border-radius:50%;background:var(--steel);color:#fff;font-size:24px;border:none;box-shadow:0 4px 14px rgba(0,0,0,.4);cursor:pointer;z-index:45;line-height:1;}
+@media(min-width:821px){.chat-launch{bottom:88px;right:24px;}}
+.chat-panel{position:fixed;right:16px;bottom:16px;width:370px;max-width:calc(100vw - 32px);height:520px;max-height:calc(100vh - 90px);background:var(--bg2);border:1px solid var(--border);border-top:3px solid var(--steel);border-radius:14px;display:none;flex-direction:column;z-index:60;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.5);}
+.chat-panel.open{display:flex;}
+@media(max-width:820px){.chat-panel{right:0;left:0;bottom:0;width:100%;max-width:none;height:75vh;border-radius:14px 14px 0 0;}}
+.chat-head{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--border);}
+.chat-head h3{margin:0;font-size:15px;}
+.chat-head .x{background:none;border:none;color:var(--dim);font-size:20px;cursor:pointer;}
+.chat-body{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;}
+.chat-b{max-width:85%;padding:8px 11px;border-radius:12px;font-size:13px;line-height:1.5;white-space:pre-wrap;word-break:break-word;}
+.chat-b.me{align-self:flex-end;background:var(--amber);color:#1C1B19;border-bottom-right-radius:3px;}
+.chat-b.bot{align-self:flex-start;background:var(--card2);color:var(--text);border-bottom-left-radius:3px;}
+.chat-b .cbtns{display:flex;gap:6px;margin-top:8px;}
+.chat-foot{display:flex;gap:6px;padding:10px;border-top:1px solid var(--border);}
+.chat-foot input{flex:1;}
+.chat-hint{font-size:11px;color:var(--faint);text-align:center;padding:0 12px 6px;}
+
 .grid{display:grid;gap:12px;}
 .grid.c2{grid-template-columns:repeat(auto-fit,minmax(200px,1fr));}
 .grid.c4{grid-template-columns:repeat(auto-fit,minmax(160px,1fr));}
@@ -196,6 +214,7 @@ table.tbl tr:last-child td{border-bottom:none;}
     <div class="nav-item" data-page="projeler"><span>🏗️</span>Projeler</div>
     <div class="nav-item" data-page="taseron"><span>🔧</span>Taşeronlar</div>
     <div class="nav-item" data-page="depo"><span>🔨</span>Demirbaş & Depo</div>
+    <div class="nav-item" data-page="finans"><span>💳</span>Sabit Ödemeler & Kartlar</div>
     <div class="nav-item" data-page="portfoy"><span>🏠</span>Portföy & Sözleşme</div>
     <div class="nav-item" data-page="sonlar"><span>🕒</span>Son Hareketler</div>
     <div class="nav-item" data-page="raporlar"><span>📁</span>Raporlar</div>
@@ -217,6 +236,7 @@ table.tbl tr:last-child td{border-bottom:none;}
     <div class="page" id="page-detay"></div>
     <div class="page" id="page-sonlar"></div>
     <div class="page" id="page-depo"></div>
+    <div class="page" id="page-finans"></div>
   </div>
 </div>
 <div class="tabbar"><div class="tabbar-inner">
@@ -228,6 +248,13 @@ table.tbl tr:last-child td{border-bottom:none;}
   <div class="tb" data-page="diger"><span class="ic">☰</span>Diğer</div>
 </div></div>
 <button class="fab" id="fabBtn">+</button>
+<button class="chat-launch" id="chatLaunch" title="Yapay Zekâ Asistan">💬</button>
+<div class="chat-panel" id="chatPanel">
+  <div class="chat-head"><h3>💬 Asistan</h3><button class="x" id="chatClose">✕</button></div>
+  <div class="chat-body" id="chatBody"></div>
+  <div class="chat-hint">Örn: "Mehmet'e 500 avans" · "bu ay kasa" · "Alper ne kadar borçlu?"</div>
+  <div class="chat-foot"><input id="chatInput" placeholder="Yazın…" autocomplete="off"><button class="btn btn-amber" id="chatSend">Gönder</button></div>
+</div>
 </div>
 
 <div class="overlay" id="modalOverlay"><div class="modal" id="modalBox"></div></div>
@@ -238,7 +265,7 @@ table.tbl tr:last-child td{border-bottom:none;}
    URL hazır girildi; sadece Publishable key'inizi yazın.
    ===================================================== */
 const SUPABASE_URL = "https://yvbbojujrouiscasgfpl.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_ecNHncTWwCmL8AhGp16V4w_XA6lWPOT";   // sb_publishable_... ile başlayan anahtar
+const SUPABASE_ANON_KEY = "BURAYA_PUBLISHABLE_KEY";   // sb_publishable_... ile başlayan anahtar
 /* ===================================================== */
 
 const CFG_OK = SUPABASE_URL.startsWith("https://") && SUPABASE_ANON_KEY.length > 30;
@@ -434,12 +461,12 @@ async function boot() {
 }
 
 /* ---------- gezinme + Diğer menüsü + FAB ---------- */
-const PAGES = { panel: renderPanel, puantaj: renderPuantaj, isciler: renderIsciler, cari: renderCari, malzemeci: renderMalzemeci, giderler: renderGiderler, projeler: renderProjeler, taseron: renderTaseron, depo: renderDepo, portfoy: renderPortfoy, raporlar: renderRaporlar, ayarlar: renderAyarlar, detay: renderDetay, sonlar: renderSonlar };
+const PAGES = { panel: renderPanel, puantaj: renderPuantaj, isciler: renderIsciler, cari: renderCari, malzemeci: renderMalzemeci, giderler: renderGiderler, projeler: renderProjeler, taseron: renderTaseron, depo: renderDepo, finans: renderFinans, portfoy: renderPortfoy, raporlar: renderRaporlar, ayarlar: renderAyarlar, detay: renderDetay, sonlar: renderSonlar };
 function nav(p) {
   if (p === "diger") {
     const box = $("modalBox");
     box.innerHTML = `<h3>Diğer</h3><div class="qa-menu">` +
-      [["projeler","🏗️ Projeler"],["malzemeci","🧱 Malzemeciler"],["taseron","🔧 Taşeronlar"],["depo","🔨 Demirbaş & Depo"],["portfoy","🏠 Portföy & Sözleşme"],["sonlar","🕒 Son Hareketler"],["raporlar","📁 Raporlar"],["ayarlar","⚙️ Ayarlar"]]
+      [["projeler","🏗️ Projeler"],["malzemeci","🧱 Malzemeciler"],["taseron","🔧 Taşeronlar"],["depo","🔨 Demirbaş & Depo"],["finans","💳 Sabit Ödemeler & Kartlar"],["portfoy","🏠 Portföy & Sözleşme"],["sonlar","🕒 Son Hareketler"],["raporlar","📁 Raporlar"],["ayarlar","⚙️ Ayarlar"]]
         .map(([k,t]) => `<button class="btn btn-outline" data-nav="${k}">${t}</button>`).join("") +
       `</div><div class="actions"><button class="btn btn-outline" id="dgClose">Kapat</button></div>`;
     $("modalOverlay").classList.add("open");
@@ -449,8 +476,11 @@ function nav(p) {
   }
   document.querySelectorAll(".nav-item,.tb").forEach((el) => el.classList.toggle("active", el.dataset.page === p));
   document.querySelectorAll(".page").forEach((el) => el.classList.toggle("active", el.id === "page-" + p));
+  if (PAGES[p]) curPage = p; // sohbetten kayıt sonrası aktif sayfayı yenilemek için
   PAGES[p]();
 }
+let curPage = "panel";
+function refreshCurrentPage() { if (PAGES[curPage]) PAGES[curPage](); }
 document.querySelectorAll(".nav-item,.tb").forEach((el) => el.onclick = () => nav(el.dataset.page));
 
 $("fabBtn").onclick = () => {
@@ -2632,6 +2662,115 @@ async function renderRaporlar() {
 }
 
 /* ---------- AYARLAR ---------- */
+/* ---------- SABİT ÖDEMELER & KARTLAR (V9) — proje K/Z'ye ASLA karışmaz ---------- */
+const FIX_CAT = { kira: "Kira", kredi: "Kredi", vergi: "Vergi", sigorta: "Sigorta", diger: "Diğer" };
+const OWNER_LBL = { sirket: "Şirket", kisisel: "Kişisel" };
+const monthKey = () => today().slice(0, 7);
+// Ayın 'day' gününe kaç gün kaldı (geçtiyse gelecek ay)
+function daysUntilDay(day) {
+  if (!day) return null;
+  const n = new Date(); const y = n.getFullYear(), m = n.getMonth(), d = n.getDate();
+  let t = new Date(y, m, day);
+  if (day < d) t = new Date(y, m + 1, day);
+  return Math.round((t - new Date(y, m, d)) / 864e5);
+}
+function cardForm(existing, cb) {
+  openForm(existing ? "Kartı Düzenle" : "Yeni Kredi Kartı", [
+    { key: "name", label: "Kart adı (örn: Garanti Bonus)", required: true },
+    { key: "statement_day", label: "Hesap kesim günü (ayın kaçı, 1-31)", type: "number" },
+    { key: "due_day", label: "Son ödeme günü (ayın kaçı, 1-31)", type: "number" },
+    { key: "owner", label: "Kime ait", type: "select", options: [{ v: "sirket", t: "Şirket" }, { v: "kisisel", t: "Kişisel" }] },
+    { key: "note", label: "Not (son 4 hane vb.)" },
+  ], existing || { owner: "sirket" }, async (v) => {
+    if (existing) { await upd("cards", existing.id, v); toast("Güncellendi"); }
+    else { await ins("cards", v); toast("Kart eklendi"); }
+    cb && cb();
+  });
+}
+function fixForm(existing, cb) {
+  openForm(existing ? "Sabit Ödemeyi Düzenle" : "Yeni Sabit Ödeme", [
+    { key: "name", label: "Ad (örn: Ofis kirası)", required: true },
+    { key: "amount", label: "Aylık tutar (TL)", type: "number" },
+    { key: "due_day", label: "Ödeme günü (ayın kaçı, 1-31)", type: "number" },
+    { key: "category", label: "Kategori", type: "select", options: Object.entries(FIX_CAT).map(([v, t]) => ({ v, t })) },
+    { key: "owner", label: "Kime ait", type: "select", options: [{ v: "sirket", t: "Şirket" }, { v: "kisisel", t: "Kişisel" }] },
+    { key: "note", label: "Not" },
+  ], existing || { category: "diger", owner: "sirket" }, async (v) => {
+    if (existing) { await upd("fixed_payments", existing.id, v); toast("Güncellendi"); }
+    else { await ins("fixed_payments", v); toast("Sabit ödeme eklendi"); }
+    cb && cb();
+  });
+}
+async function markPaid(kind, ref, cb) {
+  const per = monthKey();
+  openForm(`Ödendi İşaretle — ${ref.name} (${per})`, [
+    { key: "paid_date", label: "Ödeme tarihi", type: "date", def: today() },
+    { key: "amount", label: "Ödenen tutar (TL)", type: "number", def: ref.amount || "" },
+    { key: "note", label: "Not" },
+  ], null, async (v) => {
+    try {
+      await ins("finance_log", { kind, ref_id: ref.id, period_key: per, paid_date: v.paid_date, amount: v.amount, note: v.note });
+      toast("Ödendi olarak işaretlendi");
+    } catch (e) { toast(String(e.message || e).includes("duplicate") ? "Bu ay zaten ödenmiş görünüyor" : "Hata: " + (e.message || e)); }
+    cb && cb();
+  });
+}
+
+async function renderFinans() {
+  const el = $("page-finans");
+  el.innerHTML = `<div class="page-head"><h2>Sabit Ödemeler & Kartlar</h2>
+      <span><button class="btn btn-outline btn-sm" id="fxAddCard">+ Kart</button> <button class="btn btn-amber btn-sm" id="fxAddFix">+ Sabit Ödeme</button></span></div>
+    <div style="font-size:11.5px;color:var(--dim);margin-bottom:10px;">Bu sayfa kişisel/şirket sabit giderlerinizi ve kart son ödeme günlerini takip eder. <b>Proje kâr/zarar hesaplarına karışmaz.</b></div>
+    <div class="panel"><h3>💳 Kredi Kartları</h3><div id="fxCards" class="empty">Yükleniyor…</div></div>
+    <div class="panel"><h3>🔁 Sabit Ödemeler (bu ay: ${monthKey()})</h3><div id="fxFix" class="empty">Yükleniyor…</div></div>`;
+  const load = async () => {
+    const [cards, fixes, logs] = await Promise.all([qSilent("cards"), qSilent("fixed_payments"), qSilent("finance_log")]);
+    const per = monthKey();
+    const paid = new Set(logs.filter((l) => l.period_key === per).map((l) => l.kind + ":" + l.ref_id));
+
+    const cardRows = cards.filter((c) => c.active !== false).map((c) => {
+      const dd = daysUntilDay(c.due_day);
+      const isPaid = paid.has("card:" + c.id);
+      const near = !isPaid && dd != null && dd <= 5;
+      return `<tr>
+        <td>${esc(c.name)}<br><span style="font-size:11px;color:var(--faint);">${esc(OWNER_LBL[c.owner] || "")}${c.note ? " · " + esc(c.note) : ""}</span></td>
+        <td class="mono">${c.statement_day ? "kesim " + c.statement_day : ""}${c.due_day ? " · son öd. " + c.due_day : ""}</td>
+        <td>${isPaid ? '<span class="pill v-green">bu ay ödendi</span>' : c.due_day ? `<span class="${near ? "pending" : "pill"}">${dd === 0 ? "bugün son gün" : dd + " gün kaldı"}</span>` : ""}</td>
+        <td class="rowact">${isPaid ? "" : `<button class="btn btn-green btn-sm" data-cpaid="${c.id}">Ödendi</button>`}<button class="btn btn-outline btn-sm" data-cedit="${c.id}">✎</button><button class="btn btn-danger btn-sm" data-cdel="${c.id}">🗑</button></td>
+      </tr>`;
+    }).join("");
+    $("fxCards").innerHTML = cardRows ? `<div class="tblwrap"><table class="tbl"><tr><th>Kart</th><th>Günler</th><th>Durum</th><th></th></tr>${cardRows}</table></div>` : '<div class="empty">Henüz kart eklenmedi.</div>';
+
+    let toplamAy = 0;
+    const fixRows = fixes.filter((f) => f.active !== false).map((f) => {
+      const dd = daysUntilDay(f.due_day);
+      const isPaid = paid.has("fixed:" + f.id);
+      const near = !isPaid && dd != null && dd <= 5;
+      toplamAy += +f.amount || 0;
+      return `<tr>
+        <td>${esc(f.name)}<br><span style="font-size:11px;color:var(--faint);">${esc(FIX_CAT[f.category] || "")} · ${esc(OWNER_LBL[f.owner] || "")}</span></td>
+        <td class="mono">${fmt(f.amount)}</td>
+        <td>${f.due_day ? "her ayın " + f.due_day + "'i" : ""}</td>
+        <td>${isPaid ? '<span class="pill v-green">ödendi</span>' : f.due_day ? `<span class="${near ? "pending" : "pill"}">${dd === 0 ? "bugün" : dd + " gün"}</span>` : ""}</td>
+        <td class="rowact">${isPaid ? "" : `<button class="btn btn-green btn-sm" data-fpaid="${f.id}">Ödendi</button>`}<button class="btn btn-outline btn-sm" data-fedit="${f.id}">✎</button><button class="btn btn-danger btn-sm" data-fdel="${f.id}">🗑</button></td>
+      </tr>`;
+    }).join("");
+    $("fxFix").innerHTML = fixRows ? `<div class="tblwrap"><table class="tbl"><tr><th>Ödeme</th><th>Tutar</th><th>Gün</th><th>Durum</th><th></th></tr>${fixRows}</table></div><div style="font-size:12px;color:var(--dim);margin-top:8px;">Toplam aylık sabit yük: <b class="mono">${fmt(toplamAy)}</b></div>` : '<div class="empty">Henüz sabit ödeme eklenmedi.</div>';
+
+    const cBy = {}; cards.forEach((c) => cBy[c.id] = c);
+    const fBy = {}; fixes.forEach((f) => fBy[f.id] = f);
+    $("fxCards").querySelectorAll("[data-cpaid]").forEach((b) => b.onclick = () => markPaid("card", cBy[b.dataset.cpaid], load));
+    $("fxCards").querySelectorAll("[data-cedit]").forEach((b) => b.onclick = () => cardForm(cBy[b.dataset.cedit], load));
+    $("fxCards").querySelectorAll("[data-cdel]").forEach((b) => b.onclick = () => del("cards", b.dataset.cdel, load));
+    $("fxFix").querySelectorAll("[data-fpaid]").forEach((b) => b.onclick = () => markPaid("fixed", fBy[b.dataset.fpaid], load));
+    $("fxFix").querySelectorAll("[data-fedit]").forEach((b) => b.onclick = () => fixForm(fBy[b.dataset.fedit], load));
+    $("fxFix").querySelectorAll("[data-fdel]").forEach((b) => b.onclick = () => del("fixed_payments", b.dataset.fdel, load));
+  };
+  $("fxAddCard").onclick = () => cardForm(null, load);
+  $("fxAddFix").onclick = () => fixForm(null, load);
+  load();
+}
+
 /* ---------- EXCEL İÇE AKTARMA (V7) ---------- */
 const IMP_TURLER = {
   avans:    { t: "İşçi Avansı",     table: "advances",    entity: "workers",   entLabel: "İşçi",      dcol: "tx_date" },
@@ -2865,6 +3004,57 @@ async function renderAyarlar() {
   $("logoutBtn").onclick = async () => { await sb.auth.signOut(); location.reload(); };
   setupImport();
 }
+
+/* ---------- Uygulama içi sohbet (app-chat edge function) ---------- */
+function chatBubble(text, who, buttonsHtml) {
+  const b = document.createElement("div");
+  b.className = "chat-b " + who;
+  b.innerHTML = esc(text).replace(/\n/g, "<br>") + (buttonsHtml || "");
+  $("chatBody").appendChild(b);
+  $("chatBody").scrollTop = $("chatBody").scrollHeight;
+  return b;
+}
+let chatBusy = false;
+async function chatSend() {
+  const inp = $("chatInput");
+  const text = inp.value.trim();
+  if (!text || chatBusy) return;
+  inp.value = "";
+  chatBubble(text, "me");
+  chatBusy = true;
+  const wait = chatBubble("…", "bot");
+  try {
+    const { data, error } = await sb.functions.invoke("app-chat", { body: { message: text } });
+    wait.remove();
+    if (error) { chatBubble("⚠️ Bağlantı hatası: " + error.message, "bot"); chatBusy = false; return; }
+    if (data.kind === "draft") {
+      const bub = chatBubble("Şunu kaydedeyim mi?\n\n" + data.ozet, "bot",
+        `<div class="cbtns"><button class="btn btn-amber btn-sm" id="chatOk">✅ Onayla</button><button class="btn btn-outline btn-sm" id="chatNo">İptal</button></div>`);
+      bub.querySelector("#chatOk").onclick = async () => {
+        bub.querySelector(".cbtns").innerHTML = "kaydediliyor…";
+        const r = await sb.functions.invoke("app-chat", { body: { commit: data.kayitlar } });
+        chatBubble(r.data?.reply || "Kaydedildi.", "bot");
+        refreshCurrentPage();
+      };
+      bub.querySelector("#chatNo").onclick = () => { bub.querySelector(".cbtns").innerHTML = "<span style='color:var(--faint);font-size:12px;'>iptal edildi</span>"; };
+    } else {
+      chatBubble(data.reply || "…", "bot");
+    }
+  } catch (e) {
+    wait.remove();
+    chatBubble("⚠️ Hata: " + (e.message || e), "bot");
+  }
+  chatBusy = false;
+}
+$("chatLaunch").onclick = () => {
+  $("chatPanel").classList.add("open");
+  $("chatLaunch").style.display = "none";
+  if (!$("chatBody").childElementCount) chatBubble("Merhaba! Kayıt girebilir veya soru sorabilirsiniz. Örn: \"dolapçıya 5000 ödedim\" veya \"bugün özeti\".", "bot");
+  $("chatInput").focus();
+};
+$("chatClose").onclick = () => { $("chatPanel").classList.remove("open"); $("chatLaunch").style.display = ""; };
+$("chatSend").onclick = chatSend;
+$("chatInput").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); chatSend(); } });
 
 /* ---------- PWA: service worker kaydı (sadece https'te; yerel dosyada sessizce atlanır) ---------- */
 if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
