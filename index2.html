@@ -265,7 +265,7 @@ table.tbl tr:last-child td{border-bottom:none;}
    URL hazır girildi; sadece Publishable key'inizi yazın.
    ===================================================== */
 const SUPABASE_URL = "https://yvbbojujrouiscasgfpl.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_ecNHncTWwCmL8AhGp16V4w_XA6lWPOT";   // sb_publishable_... ile başlayan anahtar
+const SUPABASE_ANON_KEY = "BURAYA_PUBLISHABLE_KEY";   // sb_publishable_... ile başlayan anahtar
 /* ===================================================== */
 
 const CFG_OK = SUPABASE_URL.startsWith("https://") && SUPABASE_ANON_KEY.length > 30;
@@ -2701,6 +2701,22 @@ function fixForm(existing, cb) {
     cb && cb();
   });
 }
+async function stmtForm(card, cb) {
+  const per = monthKey();
+  const { data: existing } = await sb.from("card_statements").select("*").eq("card_id", card.id).eq("period_key", per).maybeSingle();
+  openForm(`${card.name} — Ekstre Bilgisi (${per})`, [
+    { key: "statement_amount", label: "Ekstre tutarı (toplam borç, TL)", type: "number", required: true },
+    { key: "min_amount", label: "Asgari ödeme tutarı (TL, opsiyonel)", type: "number" },
+  ], existing || null, async (v) => {
+    const { error } = await sb.from("card_statements").upsert(
+      { company_id: myCompany.id, card_id: card.id, period_key: per, statement_amount: v.statement_amount, min_amount: v.min_amount, created_by: me.full_name },
+      { onConflict: "company_id,card_id,period_key" }
+    );
+    if (error) { toast("Hata: " + error.message); return; }
+    toast("Ekstre bilgisi kaydedildi");
+    cb && cb();
+  });
+}
 async function markPaid(kind, ref, cb) {
   const per = monthKey();
   openForm(`Ödendi İşaretle — ${ref.name} (${per})`, [
@@ -2722,21 +2738,26 @@ async function renderFinans() {
       <span><button class="btn btn-outline btn-sm" id="fxAddCard">+ Kart</button> <button class="btn btn-amber btn-sm" id="fxAddFix">+ Sabit Ödeme</button></span></div>
     <div style="font-size:11.5px;color:var(--dim);margin-bottom:10px;">Bu sayfa kişisel/şirket sabit giderlerinizi ve kart son ödeme günlerini takip eder. <b>Proje kâr/zarar hesaplarına karışmaz.</b></div>
     <div class="panel"><h3>💳 Kredi Kartları</h3><div id="fxCards" class="empty">Yükleniyor…</div></div>
-    <div class="panel"><h3>🔁 Sabit Ödemeler (bu ay: ${monthKey()})</h3><div id="fxFix" class="empty">Yükleniyor…</div></div>`;
+    <div class="panel"><h3>🔁 Sabit Ödemeler (bu ay: ${monthKey()})</h3><div id="fxFix" class="empty">Yükleniyor…</div></div>
+    <div class="panel"><h3>📜 Geçmiş Ödemeler</h3><div id="fxHist" class="empty">Yükleniyor…</div></div>`;
   const load = async () => {
-    const [cards, fixes, logs] = await Promise.all([qSilent("cards"), qSilent("fixed_payments"), qSilent("finance_log")]);
+    const [cards, fixes, logs, stmts] = await Promise.all([qSilent("cards"), qSilent("fixed_payments"), qSilent("finance_log"), qSilent("card_statements")]);
     const per = monthKey();
     const paid = new Set(logs.filter((l) => l.period_key === per).map((l) => l.kind + ":" + l.ref_id));
+    const cBy = {}; cards.forEach((c) => cBy[c.id] = c);
+    const fBy = {}; fixes.forEach((f) => fBy[f.id] = f);
+    const stmtByCard = {}; stmts.filter((s) => s.period_key === per).forEach((s) => stmtByCard[s.card_id] = s);
 
     const cardRows = cards.filter((c) => c.active !== false).map((c) => {
       const dd = daysUntilDay(c.due_day);
       const isPaid = paid.has("card:" + c.id);
       const near = !isPaid && dd != null && dd <= 5;
+      const st = stmtByCard[c.id];
       return `<tr>
-        <td>${esc(c.name)}<br><span style="font-size:11px;color:var(--faint);">${esc(OWNER_LBL[c.owner] || "")}${c.note ? " · " + esc(c.note) : ""}</span></td>
+        <td>${esc(c.name)}<br><span style="font-size:11px;color:var(--faint);">${esc(OWNER_LBL[c.owner] || "")}${c.note ? " · " + esc(c.note) : ""}</span>${st ? `<br><span style="font-size:11px;color:var(--amber);">Ekstre: ${fmt(st.statement_amount)}${st.min_amount ? " · Asgari: " + fmt(st.min_amount) : ""}</span>` : ""}</td>
         <td class="mono">${c.statement_day ? "kesim " + c.statement_day : ""}${c.due_day ? " · son öd. " + c.due_day : ""}</td>
         <td>${isPaid ? '<span class="pill v-green">bu ay ödendi</span>' : c.due_day ? `<span class="${near ? "pending" : "pill"}">${dd === 0 ? "bugün son gün" : dd + " gün kaldı"}</span>` : ""}</td>
-        <td class="rowact">${isPaid ? "" : `<button class="btn btn-green btn-sm" data-cpaid="${c.id}">Ödendi</button>`}<button class="btn btn-outline btn-sm" data-cedit="${c.id}">✎</button><button class="btn btn-danger btn-sm" data-cdel="${c.id}">🗑</button></td>
+        <td class="rowact">${isPaid ? "" : `<button class="btn btn-green btn-sm" data-cpaid="${c.id}">Ödendi</button>`}<button class="btn btn-outline btn-sm" data-cstmt="${c.id}" title="Ekstre Gir">📋</button><button class="btn btn-outline btn-sm" data-cedit="${c.id}">✎</button><button class="btn btn-danger btn-sm" data-cdel="${c.id}">🗑</button></td>
       </tr>`;
     }).join("");
     $("fxCards").innerHTML = cardRows ? `<div class="tblwrap"><table class="tbl"><tr><th>Kart</th><th>Günler</th><th>Durum</th><th></th></tr>${cardRows}</table></div>` : '<div class="empty">Henüz kart eklenmedi.</div>';
@@ -2757,9 +2778,24 @@ async function renderFinans() {
     }).join("");
     $("fxFix").innerHTML = fixRows ? `<div class="tblwrap"><table class="tbl"><tr><th>Ödeme</th><th>Tutar</th><th>Gün</th><th>Durum</th><th></th></tr>${fixRows}</table></div><div style="font-size:12px;color:var(--dim);margin-top:8px;">Toplam aylık sabit yük: <b class="mono">${fmt(toplamAy)}</b></div>` : '<div class="empty">Henüz sabit ödeme eklenmedi.</div>';
 
-    const cBy = {}; cards.forEach((c) => cBy[c.id] = c);
-    const fBy = {}; fixes.forEach((f) => fBy[f.id] = f);
+    const histSorted = logs.slice().sort((a, b) => String(b.paid_date + (b.created_at || "")).localeCompare(String(a.paid_date + (a.created_at || ""))));
+    const histRows = histSorted.slice(0, 60).map((l) => {
+      const name = l.kind === "card" ? (cBy[l.ref_id]?.name || "(silinmiş kart)") : (fBy[l.ref_id]?.name || "(silinmiş ödeme)");
+      return `<tr>
+        <td>${esc(name)}</td>
+        <td><span class="pill">${l.kind === "card" ? "💳 Kart" : "🔁 Sabit"}</span></td>
+        <td class="mono">${esc(l.period_key)}</td>
+        <td class="mono v-green">${l.amount != null ? fmt(l.amount) : "—"}</td>
+        <td>${dstr(l.paid_date)}</td>
+        <td style="font-size:11px;color:var(--faint);">${esc(l.note || "")}${l.created_by ? " · " + esc(l.created_by) : ""}</td>
+      </tr>`;
+    }).join("");
+    $("fxHist").innerHTML = histRows
+      ? `<div class="tblwrap"><table class="tbl"><tr><th>Ad</th><th>Tür</th><th>Dönem</th><th>Ödenen</th><th>Tarih</th><th>Not</th></tr>${histRows}</table></div>${histSorted.length > 60 ? '<div style="font-size:11.5px;color:var(--dim);margin-top:8px;">Son 60 ödeme gösteriliyor.</div>' : ""}`
+      : '<div class="empty">Henüz ödeme kaydı yok — "Ödendi" işaretledikçe burada birikir.</div>';
+
     $("fxCards").querySelectorAll("[data-cpaid]").forEach((b) => b.onclick = () => markPaid("card", cBy[b.dataset.cpaid], load));
+    $("fxCards").querySelectorAll("[data-cstmt]").forEach((b) => b.onclick = () => stmtForm(cBy[b.dataset.cstmt], load));
     $("fxCards").querySelectorAll("[data-cedit]").forEach((b) => b.onclick = () => cardForm(cBy[b.dataset.cedit], load));
     $("fxCards").querySelectorAll("[data-cdel]").forEach((b) => b.onclick = () => del("cards", b.dataset.cdel, load));
     $("fxFix").querySelectorAll("[data-fpaid]").forEach((b) => b.onclick = () => markPaid("fixed", fBy[b.dataset.fpaid], load));
