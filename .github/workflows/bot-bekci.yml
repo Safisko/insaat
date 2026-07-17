@@ -1,0 +1,39 @@
+# Telegram bot zamanlanmış bekçisi (akşam puantaj hatırlatması + sabah özeti)
+# Konum: deponuzda .github/workflows/bot-bekci.yml
+#
+# Kurulum:
+#  1) Bu dosyayı GitHub deposunda .github/workflows/ klasörüne ekleyin.
+#  2) Supabase Edge Functions > telegram-webhook > Secrets'a CRON_SECRET ekleyin
+#     (rastgele uzun bir metin — örn. parola üretici ile 32 karakter).
+#  3) GitHub deposunda Settings > Secrets and variables > Actions > New repository secret:
+#     - FUNC_URL   = https://PROJENIZ.supabase.co/functions/v1/telegram-webhook
+#     - CRON_SECRET = (Supabase'e girdiğiniz AYNI metin)
+#
+# Saatler UTC'dir; Türkiye = UTC+3.
+name: Bot Bekcisi
+on:
+  schedule:
+    - cron: "0 16 * * *"   # 19:00 TR — akşam puantaj hatırlatması
+    - cron: "0 5 * * *"    # 08:00 TR — sabah özeti
+  workflow_dispatch:        # elle test için
+    inputs:
+      job:
+        description: "evening veya morning"
+        default: "evening"
+jobs:
+  tetikle:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Zamana göre işi belirle
+        id: job
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "job=${{ github.event.inputs.job }}" >> $GITHUB_OUTPUT
+          elif [ "$(date -u +%H)" = "16" ]; then
+            echo "job=evening" >> $GITHUB_OUTPUT
+          else
+            echo "job=morning" >> $GITHUB_OUTPUT
+          fi
+      - name: Botu tetikle
+        run: |
+          curl -s -X POST "${{ secrets.FUNC_URL }}?cron=${{ steps.job.outputs.job }}&secret=${{ secrets.CRON_SECRET }}"
